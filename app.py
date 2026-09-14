@@ -806,7 +806,7 @@ function openEditor(name,tplAgents){
   editing=name||null;dirty=false;confirmState=null;
   $("#edTitle").textContent=name?("Edit preset: "+name):"New preset";
   const nameIn=$("#presetName");
-  nameIn.value=name||"";nameIn.readOnly=!!name;
+  nameIn.value=name||"";nameIn.readOnly=false;
   const p=(name&&(config&&config.presets||{})[name])||tplAgents||{};
   edState=null;
   ensureEdState();
@@ -1037,7 +1037,7 @@ function markDirty(){if(!dirty){dirty=true;$("#unsaved").hidden=false;}}
 async function saveEditor(){
   const name=$("#presetName").value.trim();
   if(!NAME_RE.test(name)){toast("Invalid preset name: use letters, digits, '.', '-' or '_' (start with letter/digit)","error");return;}
-  if(!editing&&(config&&config.presets||{})[name]){toast("Preset '"+name+"' already exists — use Edit on its card, or pick another name","error");return;}
+  if(editing!==name&&(config&&config.presets||{})[name]){toast("Preset '"+name+"' already exists — use Edit on its card, or pick another name","error");return;}
   const agents={};
   AGENTS.forEach(ag=>{
     const st=edState?edState[ag]:{model:"",variant:"",skills:"",mcps:""};
@@ -1048,7 +1048,7 @@ async function saveEditor(){
     if(model||variant||skills.length||mcps.length)agents[ag]={model:model,variant:variant,skills:skills,mcps:mcps};
   });
   try{
-    await api("/api/preset",{name:name,agents:agents});
+    await api("/api/preset",{name:name,oldName:editing||null,agents:agents});
     dirty=false;toast("Preset '"+name+"' saved");
     await loadConfig();showView("list");
   }catch(e){toast(e.message,"error");}
@@ -1259,8 +1259,20 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/preset":
             name = valid_name(body.get("name"))
-            presets[name] = sanitize_agents(body.get("agents"))
-            msg = "Preset '%s' saved" % name
+            agents = sanitize_agents(body.get("agents"))
+            old = str(body.get("oldName") or "").strip()
+            if old and valid_name(old, field="old name") != name:
+                if old not in presets:
+                    raise ApiError("Preset '%s' does not exist" % old, 404)
+                if name in presets:
+                    raise ApiError("Preset '%s' already exists" % name)
+                del presets[old]
+                if cfg.get("preset") == old:
+                    cfg["preset"] = name
+                msg = "Preset '%s' renamed to '%s'" % (old, name)
+            else:
+                msg = "Preset '%s' saved" % name
+            presets[name] = agents
 
         elif path == "/api/activate":
             name = valid_name(body.get("name"))
