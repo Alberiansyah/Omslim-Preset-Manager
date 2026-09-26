@@ -287,6 +287,66 @@ def load_provider_models(config_dir):
     return result
 
 
+# ------------------------------------------- opencode.jsonc management
+
+def load_opencode_config(path):
+    """Load opencode.jsonc. Returns (dict, None) or (None, error)."""
+    if not os.path.exists(path):
+        return None, "opencode.jsonc not found"
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.loads(strip_jsonc(f.read()))
+    except Exception as e:
+        return None, "Invalid opencode.jsonc: %s" % e
+    if not isinstance(data, dict):
+        return None, "opencode.jsonc root must be a JSON object"
+    return data, None
+
+
+def save_opencode_config(path, data):
+    """Write opencode.jsonc atomically with backup."""
+    backup_config(path)
+    atomic_write_json(path, data)
+
+
+def get_opencode_provider_models(config_path):
+    """Get the omniroute provider models from opencode.jsonc.
+
+    Returns {providerName: {modelId: {...}}} or {}."""
+    data, err = load_opencode_config(config_path)
+    if err:
+        return {}
+    providers = data.get("provider")
+    if not isinstance(providers, dict):
+        return {}
+    result = {}
+    for pname, pdef in providers.items():
+        if not isinstance(pdef, dict):
+            continue
+        models = pdef.get("models")
+        if isinstance(models, dict) and models:
+            result[pname] = models
+    return result
+
+
+def set_opencode_provider_models(config_path, provider_name, models):
+    """Set the models for a provider in opencode.jsonc.
+
+    config_path is the omo slim config path; opencode.jsonc is in the same dir."""
+    cfg_dir = os.path.dirname(config_path)
+    oc_path = os.path.join(cfg_dir, "opencode.jsonc")
+    data, err = load_opencode_config(oc_path)
+    if err:
+        raise ApiError(err, 500)
+    if "provider" not in data or not isinstance(data["provider"], dict):
+        data["provider"] = {}
+    if provider_name not in data["provider"]:
+        data["provider"][provider_name] = {}
+    data["provider"][provider_name]["models"] = models
+    save_opencode_config(oc_path, data)
+    return data
+
+
 # ------------------------------------------------- live model list (proxy API)
 
 MODELS_TTL = 300  # seconds
@@ -294,7 +354,7 @@ MODELS_TTL = 300  # seconds
 # Curated providers pulled from the public models.dev registry (the same
 # registry OpenCode uses). Keys must match models.dev provider ids.
 CURATED_MODELSDEV = [
-    "anthropic", "openai", "google", "opencode", "deepseek", "xai",
+    "anthropic", "openai", "google", "opencode", "opencode-go", "deepseek", "xai",
     "moonshotai", "kimi-for-coding", "zai-coding-plan", "github-copilot",
     "groq", "mistral", "openrouter", "cerebras", "together", "qwen",
 ]
@@ -450,8 +510,56 @@ def get_provider_models(config_dir):
                 combined[prov] = combined[prov] + [i for i in ids if i not in seen]
             else:
                 combined[prov] = list(ids)
+        # Cache the combined result so fast reads see the full catalog.
+        with _live_lock:
+            _live_cache["data"] = combined
+            _live_cache["ts"] = time.time()
         return combined
     return merged
+
+
+_warming = False
+
+
+def get_provider_models_fast(config_dir):
+    """Return provider models from cache only — never blocks on network.
+
+    Falls back to static entries from opencode.jsonc (fast disk read).
+    When the cache is stale/missing, triggers a background refresh."""
+    now = time.time()
+    with _live_lock:
+        fresh = _live_cache["data"] and now - _live_cache["ts"] < MODELS_TTL
+        recent_fail = now - _live_cache["fail_ts"] < 60
+        cached = _live_cache["data"]
+    if fresh:
+        return cached
+    if recent_fail:
+        return cached or load_provider_models(config_dir)
+    warm_provider_models(config_dir)
+    return load_provider_models(config_dir)
+
+
+def warm_provider_models(config_dir):
+    """Populate the provider-models cache in a background thread (daemon).
+
+    No-op if a warm-up is already in flight."""
+    global _warming
+    with _live_lock:
+        if _warming:
+            return
+        _warming = True
+
+    def _warm():
+        global _warming
+        try:
+            get_provider_models(config_dir)
+        except Exception:
+            pass
+        finally:
+            with _live_lock:
+                _warming = False
+
+    threading.Thread(target=_warm, daemon=True).start()
 
 
 # ---------------------------------------------------------------- validation
@@ -627,6 +735,19 @@ footer{margin-top:26px;padding-top:12px;border-top:1px solid var(--border);color
 .cb-empty{min-height:32px;display:flex;align-items:center;padding:7px 10px;color:var(--muted);font-family:var(--mono);font-size:12px;cursor:default}
 .cb-more{display:block;width:calc(100% - 16px);margin:4px 8px 8px;padding:7px 10px;border:1px solid var(--border2);border-radius:7px;background:transparent;color:var(--muted);font:12px var(--mono);text-align:center;cursor:pointer}
 .cb-more:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+/* --- provider models view --- */
+.pm-toolbar{display:flex;gap:12px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.pm-toolbar .muted{flex:1}
+.pm-provider{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--panel);margin-bottom:14px}
+.pm-provider h3{margin:0 0 10px;font-size:15px;font-family:var(--mono);color:var(--accent)}
+.pm-model-list{display:flex;flex-wrap:wrap;gap:6px}
+.pm-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;border:1px solid var(--border2);background:var(--panel2);font-family:var(--mono);font-size:12px;color:var(--text);cursor:pointer;transition:border-color .15s,background .15s}
+.pm-chip:hover{border-color:var(--danger);background:#2a1414}
+.pm-chip .pm-remove{color:var(--danger);font-weight:700}
+.pm-add-section{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pm-add-section input{flex:1;min-width:200px}
+.pm-empty{color:var(--muted);font-style:italic;padding:12px 0}
+.pm-badge{display:inline-block;padding:3px 11px;border-radius:999px;font-size:12px;border:1px solid var(--accent);color:var(--accent);background:var(--accent-dim);margin-left:8px}
 </style>
 </head>
 <body>
@@ -643,6 +764,7 @@ footer{margin-top:26px;padding-top:12px;border-top:1px solid var(--border);color
     <section id="listView">
       <div class="toolbar">
         <button class="btn primary" data-action="add">+ Add preset</button>
+        <button class="btn" data-action="pm-open" id="pmOpenBtn" hidden>Provider Models</button>
         <span class="muted" id="countInfo"></span>
       </div>
       <div class="cards" id="cards"></div>
@@ -672,6 +794,15 @@ footer{margin-top:26px;padding-top:12px;border-top:1px solid var(--border);color
         <nav class="agent-rail" id="agentRail" aria-label="Agents"></nav>
         <div class="agent-pane" id="agentPane"></div>
       </div>
+    </section>
+    <section id="providerModelsView" hidden>
+      <div class="pm-toolbar">
+        <button class="btn" data-action="pm-back">&larr; Back</button>
+        <h2 style="margin:0;font-size:16px;font-weight:600">Provider Models</h2>
+        <span class="muted" id="pmProviderName"></span>
+        <span class="pm-badge" id="pmBadge">opencode.jsonc</span>
+      </div>
+      <div id="pmContent"></div>
     </section>
   </main>
   <footer>
@@ -715,15 +846,6 @@ async function api(path,body){
   if(!data.ok)throw new Error(data.error||"Request failed");
   return data;
 }
-async function loadConfig(){
-  try{
-    const res=await fetch("/api/config");
-    const data=await res.json();
-    if(!data.ok){config=null;showError(data.error||"Failed to load config");}
-    else{config=data.config;configPath=data.configPath;backups=(data.backups||[]).length;providerModels=data.providers||{};clearError();}
-  }catch(e){config=null;showError("Cannot reach server: "+e.message);}
-  renderHeader();renderList();
-}
 function renderHeader(){
   $("#cfgPath").textContent=configPath||"(config not loaded)";
   $("#activeBadge").textContent="Active: "+(config?(config.preset||"(none)"):"(not loaded)");
@@ -763,13 +885,81 @@ function renderList(){
   const dup=document.querySelector(".dupname");
   if(dup)dup.focus();
 }
-/* ---- split-view editor state + model catalog ---- */
-const MB_CAP_NOQ=30,MB_CAP_Q=200;
-const cbData={models:[],variants:[],groups:[]};
-let activeAgent=AGENTS[0];
-let mbState={q:"",showAll:false,flat:[],active:-1};
-let edState=null;
-let customOpen=false;
+/* ---- provider models view state ---- */
+let pmProvider="omniroute", pmModels={}, pmHasOpencodeJsonc=false;
+
+async function loadProviderModelsView(){
+  try{
+    const res=await fetch("/api/opencode-config");
+    const data=await res.json();
+    if(!data.ok){toast(data.error||"Failed to load opencode.jsonc","error");return;}
+    pmHasOpencodeJsonc=true;
+    const cfg=data.config;
+    const providers=cfg&&cfg.provider||{};
+    const provNames=Object.keys(providers);
+    if(!provNames.length){toast("No providers found in opencode.jsonc","error");return;}
+    pmProvider=provNames[0];
+    const provData=providers[pmProvider]||{};
+    pmModels=provData.models||{};
+    renderProviderModelsView();
+    showView("providerModels");
+  }catch(e){toast("Cannot load opencode.jsonc: "+e.message,"error");}
+}
+
+function renderProviderModelsView(){
+  const content=$("#pmContent");if(!content)return;
+  const provNameEl=$("#pmProviderName");
+  if(provNameEl)provNameEl.textContent=pmProvider;
+  const modelEntries=Object.entries(pmModels);
+  let html='<div class="pm-provider">'+
+    '<h3>'+esc(pmProvider)+' <span class="muted" style="font-size:11px;text-transform:none;letter-spacing:0">('+modelEntries.length+' model'+(modelEntries.length!==1?"s":"")+')</span></h3>'+
+    '<div class="pm-model-list">';
+  if(!modelEntries.length){
+    html+='<span class="pm-empty">No models declared yet. Add models below.</span>';
+  }else{
+    modelEntries.forEach(([mid,meta])=>{
+      html+='<span class="pm-chip" data-pm-remove="'+esc(mid)+'">'+esc(mid)+' <span class="pm-remove">&times;</span></span>';
+    });
+  }
+  html+='</div>';
+  html+='<div class="pm-add-section">'+
+    '<input id="pmAddInput" type="text" placeholder="Add model ID (e.g. cmd/MiniMaxAI/MiniMax-M3)" spellcheck="false" autocomplete="off">'+
+    '<button class="btn primary" data-action="pm-add">Add</button>'+
+    '<button class="btn" data-action="pm-add-from-browser">From catalog</button>'+
+    '</div>'+
+    '<div id="pmCatalog" style="margin-top:12px"></div>'+
+    '</div>';
+  html+='<div style="margin-top:14px;display:flex;gap:8px">'+
+    '<button class="btn primary" data-action="pm-save">Save to opencode.jsonc</button>'+
+    '<button class="btn" data-action="pm-back">Cancel</button>'+
+    '</div>';
+  content.innerHTML=html;
+}
+
+function showView(view){
+  $("#listView").hidden=view!=="list";
+  $("#editorView").hidden=view!=="editor";
+  $("#providerModelsView").hidden=view!=="providerModels";
+  $("#discardBar").hidden=true;
+}
+
+async function pmAddModel(){
+  const inp=$("#pmAddInput");
+  const mid=inp?inp.value.trim():"";
+  if(!mid){toast("Enter a model ID","error");return;}
+  if(pmModels[mid]){toast("Model already in list","error");return;}
+  pmModels[mid]={name:mid};
+  renderProviderModelsView();
+  if(inp)inp.value="";
+}
+
+async function pmSave(){
+  try{
+    const res=await api("/api/opencode-provider-models",{provider:pmProvider,models:pmModels});
+    if(res.ok){toast("Provider models saved to opencode.jsonc");loadConfig();showView("list");}
+    else{toast(res.error||"Failed to save","error");}
+  }catch(e){toast("Error: "+e.message,"error");}
+}
 
 function rebuildDatalists(){
   const models=new Set(),variants=new Set(["low","medium","high","max"]);
@@ -1004,11 +1194,6 @@ function copyToAll(kind){
   if(changed){markDirty();renderRail();}
   toast(kind+" applied to all agents");
 }
-function showView(v){
-  $("#listView").hidden=v!=="list";
-  $("#editorView").hidden=v!=="editor";
-  $("#discardBar").hidden=true;
-}
 async function openTemplatePicker(){
   const ov=$("#tplOverlay");
   ov.hidden=false;
@@ -1152,7 +1337,74 @@ $("#agentsGrid").addEventListener("keydown",e=>{
 ["input","change"].forEach(ev=>document.addEventListener(ev,e=>{
   if(e.target.id==="mbSearch")return;
   if(e.target.closest("#editorView"))markDirty();
+  if(e.target.closest("#providerModelsView"))markDirty();
 },true));
+
+/* ---- provider models view event handlers ---- */
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-action]");
+  if(!b)return;
+  const act=b.dataset.action;
+  if(act==="pm-open"){loadProviderModelsView();return;}
+  if(act==="pm-back"){showView("list");return;}
+  if(act==="pm-add"){await pmAddModel();return;}
+  if(act==="pm-add-from-browser"){pmShowCatalog();return;}
+  if(act==="pm-save"){await pmSave();return;}
+  if(act.startsWith("pm-remove")){
+    const mid=act.replace("pm-remove","");
+    delete pmModels[mid];
+    renderProviderModelsView();
+    return;
+  }
+});
+document.addEventListener("click",e=>{
+  const chip=e.target.closest("[data-pm-remove]");
+  if(chip){
+    const mid=chip.dataset.pmRemove;
+    delete pmModels[mid];
+    renderProviderModelsView();
+    return;
+  }
+  const catItem=e.target.closest("[data-pm-cat-add]");
+  if(catItem){
+    const mid=catItem.dataset.pmCatAdd;
+    if(!pmModels[mid]){pmModels[mid]={name:mid};renderProviderModelsView();}
+    return;
+  }
+});
+
+function pmShowCatalog(){
+  const cat=$("#pmCatalog");if(!cat)return;
+  if(!providerModels||!Object.keys(providerModels).length){
+    cat.innerHTML='<span class="pm-empty">No catalog available. Ensure models.dev is reachable.</span>';
+    return;
+  }
+  let html="";
+  const provs=Object.keys(providerModels).sort();
+  provs.forEach(prov=>{
+    const models=providerModels[prov]||[];
+    html+='<div style="margin-bottom:8px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:var(--accent);margin-bottom:4px">'+esc(prov)+'</div><div style="display:flex;flex-wrap:wrap;gap:4px">';
+    models.forEach(m=>{
+      const full=prov+"/"+m;
+      const sel=pmModels[full]?"mb-sel":"";
+      html+='<span class="cb-opt '+sel+'" data-pm-cat-add="'+esc(full)+'" style="font-size:11px;padding:4px 8px">'+esc(m)+'</span>';
+    });
+    html+='</div></div>';
+  });
+  cat.innerHTML=html;
+}
+
+async function loadConfig(){
+  try{
+    const res=await fetch("/api/config");
+    const data=await res.json();
+    if(!data.ok){config=null;showError(data.error||"Failed to load config");}
+    else{config=data.config;configPath=data.configPath;backups=(data.backups||[]).length;providerModels=data.providers||{};pmHasOpencodeJsonc=data.hasOpencodeJsonc||false;clearError();}
+  }catch(e){config=null;showError("Cannot reach server: "+e.message);}
+  renderHeader();renderList();
+  const pmBtn=$("#pmOpenBtn");
+  if(pmBtn)pmBtn.hidden=!pmHasOpencodeJsonc;
+}
 loadConfig();
 </script>
 </body>
@@ -1195,7 +1447,9 @@ class Handler(BaseHTTPRequestHandler):
                     "config": cfg,
                     "configPath": app.config_path,
                     "backups": list_backups(app.config_path),
-                    "providers": get_provider_models(os.path.dirname(app.config_path)),
+                    "providers": get_provider_models_fast(os.path.dirname(app.config_path)),
+                    "opencodeJsoncPath": os.path.join(os.path.dirname(app.config_path), "opencode.jsonc"),
+                    "hasOpencodeJsonc": os.path.exists(os.path.join(os.path.dirname(app.config_path), "opencode.jsonc")),
                 })
             return
         if path == "/api/templates":
@@ -1221,6 +1475,22 @@ class Handler(BaseHTTPRequestHandler):
                     "ok": True,
                     "builtin": BUILTIN_TEMPLATES,
                     "existing": existing,
+                })
+            return
+        if path == "/api/opencode-config":
+            app = self.server.app
+            with app.lock:
+                cfg_dir = os.path.dirname(app.config_path)
+                oc_path = os.path.join(cfg_dir, "opencode.jsonc")
+                data, err = load_opencode_config(oc_path)
+                if err:
+                    self._send(404, {"ok": False, "error": err})
+                    return
+                prov_models = get_opencode_provider_models(oc_path)
+                self._send(200, {
+                    "ok": True,
+                    "config": data,
+                    "providerModels": prov_models,
                 })
             return
         self._send(404, {"ok": False, "error": "Not found"})
@@ -1300,6 +1570,18 @@ class Handler(BaseHTTPRequestHandler):
             presets[new] = copy.deepcopy(presets[name])
             msg = "Preset '%s' copied to '%s'" % (name, new)
 
+        elif path == "/api/opencode-provider-models":
+            provider = valid_name(body.get("provider"), field="provider")
+            models = body.get("models")
+            if not isinstance(models, dict):
+                raise ApiError("'models' must be an object", 400)
+            # Validate model IDs
+            for mid in models:
+                if not isinstance(mid, str) or not mid.strip():
+                    raise ApiError("Invalid model ID", 400)
+            set_opencode_provider_models(app.config_path, provider, models)
+            msg = "Provider '%s' models updated" % provider
+
         else:
             raise ApiError("Not found", 404)
 
@@ -1317,6 +1599,7 @@ def main():
 
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     server.app = App(args.config)
+    warm_provider_models(os.path.dirname(server.app.config_path))
     print("Preset Manager  ->  http://%s:%d" % (args.host, args.port))
     print("Config file     ->  %s" % server.app.config_path)
     print("Press Ctrl+C to stop.")
