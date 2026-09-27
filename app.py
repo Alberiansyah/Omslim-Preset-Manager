@@ -329,6 +329,24 @@ def get_opencode_provider_models(config_path):
     return result
 
 
+def normalize_provider_model_id(provider_name, model_id):
+    """Return the upstream id to store as an opencode.jsonc `models` key.
+
+    OpenCode sends the stored key through to the provider after stripping the
+    provider name prefix. So the key must be the raw upstream id: for provider
+    `omniroute` a key of `command-code/stealth/pixel-canary` makes OpenCode call
+    OmniRoute with that id, and OmniRoute routes on its first segment. Storing
+    `omniroute/command-code/stealth/pixel-canary` instead makes OmniRoute treat
+    `omniroute` as the upstream provider and fail with
+    "No active credentials for provider: omniroute". Strip a redundant
+    leading "<provider>/" so the stored key is always upstream-relative."""
+    mid = str(model_id or "").strip()
+    prefix = provider_name + "/"
+    if mid.startswith(prefix) and len(mid) > len(prefix):
+        return mid[len(prefix):]
+    return mid
+
+
 def set_opencode_provider_models(config_path, provider_name, models):
     """Set the models for a provider in opencode.jsonc.
 
@@ -342,7 +360,16 @@ def set_opencode_provider_models(config_path, provider_name, models):
         data["provider"] = {}
     if provider_name not in data["provider"]:
         data["provider"][provider_name] = {}
-    data["provider"][provider_name]["models"] = models
+    # Store upstream-relative keys; preserve each model's definition otherwise.
+    normalized = {}
+    for mid, mdef in models.items():
+        key = normalize_provider_model_id(provider_name, mid)
+        if not key:
+            continue
+        entry = copy.deepcopy(mdef) if isinstance(mdef, dict) else {"name": key}
+        entry.setdefault("name", key)
+        normalized[key] = entry
+    data["provider"][provider_name]["models"] = normalized
     save_opencode_config(oc_path, data)
     return data
 
@@ -1034,12 +1061,23 @@ let pmCatalogOpen=false, pmQuery="", pmActive=-1, pmCatQuery="", pmCatProvider="
 const PM_CAP=8, PM_CAT_CAP=48;
 let pmSuggestions=[];
 
-/* Fully qualified catalog list: {full,provider,raw}. */
+/* Model id that is actually sent to the provider, i.e. the stored key.
+   For the provider being edited its live ids are already upstream-complete
+   (e.g. OmniRoute routes on the "command-code/..." prefix), so they must NOT be
+   prefixed again. Ids coming from other providers keep their "<provider>/" form. */
+function pmStoredId(prov,raw){
+  if(prov===pmProvider){
+    const p=pmProvider+"/";
+    return raw.indexOf(p)===0&&raw.length>p.length?raw.slice(p.length):raw;
+  }
+  return prov+"/"+raw;
+}
+/* Catalog list as stored ids: {full,provider,raw}. */
 function pmCatalogList(){
   const out=[];
   const src=providerModels||{};
   Object.keys(src).forEach(prov=>{
-    (src[prov]||[]).forEach(raw=>{out.push({full:prov+"/"+raw,provider:prov,raw:raw});});
+    (src[prov]||[]).forEach(raw=>{out.push({full:pmStoredId(prov,raw),provider:prov,raw:raw});});
   });
   return out;
 }
