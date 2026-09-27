@@ -642,14 +642,38 @@ h1 .dot{color:var(--accent)}
 .btn.danger{color:var(--danger);border-color:#5b2b2b}
 .btn.danger:hover{background:#2a1414;border-color:var(--danger)}
 .btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+/* --- preset cards (list view) --- */
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
-.card:hover{border-color:var(--border2)}
-.card.activecard{border-color:var(--accent)}
+.card{position:relative;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:11px;transition:border-color .16s,transform .16s,box-shadow .16s;animation:cardIn .22s ease-out both}
+.card:nth-child(2){animation-delay:.04s}
+.card:nth-child(3){animation-delay:.08s}
+.card:nth-child(4){animation-delay:.12s}
+.card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.32)}
+.card.activecard{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.card.activecard:hover{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent),0 10px 26px rgba(0,0,0,.32)}
 .card .head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .card h3{margin:0;font-size:15px;font-family:var(--mono);font-weight:600;word-break:break-all}
-.summary{font-family:var(--mono);font-size:11.5px;color:var(--muted);background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;white-space:pre-wrap;word-break:break-all;flex:1}
+.card.activecard h3{color:var(--accent)}
+.summary{font-family:var(--mono);font-size:11.5px;color:var(--muted);background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;display:flex;flex-direction:column;flex:1;overflow:hidden}
+.srow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--border)}
+.srow:last-child{border-bottom:none}
+.sname{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;flex:0 0 auto}
+.smodel{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0;flex:1 1 auto}
+.smodelTxt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.summary .cb-prov{color:var(--muted)}
+.summary .cb-raw{color:var(--text);font-weight:600}
+.svar{flex:0 0 auto;white-space:nowrap;color:var(--accent);font-size:10.5px;border:1px solid var(--accent-dim);border-radius:999px;padding:0 6px;margin-left:0}
+.smore{color:var(--muted);font-size:10.5px;padding:5px 0;font-style:italic}
 .row{display:flex;gap:8px;flex-wrap:wrap}
+.card .row .btn{flex:1;text-align:center;white-space:nowrap}
+@keyframes cardIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* --- empty state --- */
+.emptycards{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:46px 22px;border:1px dashed var(--border2);border-radius:14px;background:var(--panel);animation:cardIn .22s ease-out both}
+.emptycards .e-ico{color:var(--border2)}
+.emptycards h3{margin:0;font-size:16px;font-weight:650}
+.emptycards p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.55;max-width:46ch}
 .confirmbar{display:flex;align-items:center;gap:10px;background:#2a1414;border:1px solid #5b2b2b;border-radius:8px;padding:8px 10px;font-size:13px;flex-wrap:wrap}
 .confirmbar.neutral{background:#1a2030;border-color:var(--border2)}
 .confirmbar input{width:auto;flex:1;min-width:160px}
@@ -689,6 +713,15 @@ h1 .dot{color:var(--accent)}
 .mb-list::-webkit-scrollbar{width:10px}
 .mb-list::-webkit-scrollbar-track{background:transparent}
 .mb-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:6px;border:2px solid #0d1117}
+/* chip layout for the editor model browser (mirrors provider catalog pills) */
+.mb-tabs{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--panel);max-height:112px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.mb-chips{display:flex;flex-wrap:wrap;gap:5px;padding:6px}
+#mbList .cb-opt{min-height:0;min-width:0;max-width:100%;padding:4px 9px;border:1px solid var(--border);background:var(--panel2);border-radius:999px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#mbList .cb-opt .cb-prov{flex:0 0 auto}
+#mbList .cb-opt:hover,#mbList .cb-opt.kb-active{border-color:var(--accent);background:var(--accent-dim)}
+#mbList .cb-opt.mb-sel{border-color:var(--accent)}
+#mbList .cb-opt .cb-check{margin-right:1px}
+#mbList .cb-more{width:100%;margin:6px 0 2px}
 .seg{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .seg-btn{min-height:32px;padding:6px 14px;border:1px solid var(--border2);border-radius:999px;background:transparent;color:var(--muted);font:12.5px var(--mono);cursor:pointer;transition:border-color .12s,background .12s,color .12s}
 .seg-btn:hover{border-color:var(--muted);color:var(--text)}
@@ -723,8 +756,6 @@ footer{margin-top:26px;padding-top:12px;border-top:1px solid var(--border);color
 .tpl b{font-size:13.5px;font-family:var(--mono);word-break:break-all}
 .tpl span{font-size:11.5px;color:var(--muted);line-height:1.45}
 /* --- model browser list (persistent, split-view) --- */
-.cb-group{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:baseline;gap:10px;background:#0d1117;margin:0 -4px;padding:6px 12px 4px;font-size:10.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--accent);border-bottom:1px solid var(--border);cursor:default;user-select:none}
-.cb-group .cb-count{color:var(--muted);font-size:10px;letter-spacing:.2px;text-transform:none}
 .cb-opt{min-height:32px;display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid transparent;border-radius:7px;font-family:var(--mono);font-size:12.5px;white-space:nowrap;overflow:hidden;cursor:pointer;user-select:none}
 .cb-opt .cb-prov{color:var(--muted);flex:0 0 auto}
 .cb-opt .cb-raw{color:var(--text);font-weight:600}
@@ -744,10 +775,80 @@ footer{margin-top:26px;padding-top:12px;border-top:1px solid var(--border);color
 .pm-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;border:1px solid var(--border2);background:var(--panel2);font-family:var(--mono);font-size:12px;color:var(--text);cursor:pointer;transition:border-color .15s,background .15s}
 .pm-chip:hover{border-color:var(--danger);background:#2a1414}
 .pm-chip .pm-remove{color:var(--danger);font-weight:700}
-.pm-add-section{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pm-add-section{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
 .pm-add-section input{flex:1;min-width:200px}
 .pm-empty{color:var(--muted);font-style:italic;padding:12px 0}
 .pm-badge{display:inline-block;padding:3px 11px;border-radius:999px;font-size:12px;border:1px solid var(--accent);color:var(--accent);background:var(--accent-dim);margin-left:8px}
+/* --- provider-models: add input + autocomplete --- */
+.pm-add-wrap{position:relative;flex:1 1 260px;min-width:220px}
+.pm-add-wrap input{width:100%}
+.pm-ac{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:#0d1117;border:1px solid var(--border2);border-radius:10px;box-shadow:0 18px 44px rgba(0,0,0,.55);padding:4px;max-height:min(340px,50vh);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.pm-ac-head{padding:6px 10px 4px;font-size:10.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--accent)}
+.pm-ac .cb-opt{border-radius:7px}
+.pm-ac .cb-opt .cb-check{margin-left:auto}
+.pm-ac-hint{padding:7px 10px;color:var(--muted);font-family:var(--mono);font-size:11.5px;line-height:1.5}
+/* --- provider-models: catalog (provider tabs + model panel) --- */
+.pm-cat{margin-top:12px;border:1px solid var(--border);border-radius:12px;background:#0d1117;overflow:hidden}
+.pm-cat-search{border-bottom:1px solid var(--border)}
+.pm-cat-search input{border:none;border-radius:0;font-family:var(--mono);font-size:12.5px}
+.pm-cat-search input:focus{outline:none;border:none}
+.pm-cat-tabs{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--panel)}
+.pm-cat-pill{min-height:30px;display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border:1px solid var(--border2);border-radius:999px;background:transparent;color:var(--muted);font:12px var(--mono);cursor:pointer;transition:border-color .12s,background .12s,color .12s}
+.pm-cat-pill:hover{border-color:var(--muted);color:var(--text)}
+.pm-cat-pill.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);font-weight:600}
+.pm-cat-pill.dim{opacity:.4}
+.pm-cat-pill .pcount{color:var(--muted);font-size:10.5px;border:1px solid var(--border2);border-radius:999px;padding:0 6px}
+.pm-cat-pill.on .pcount{color:var(--accent);border-color:var(--accent)}
+.pm-cat-pill:focus-visible{outline:none;box-shadow:0 0 0 3px var(--accent-dim)}
+.pm-cat-panel{max-height:min(460px,52vh);overflow-y:auto;overscroll-behavior:contain;padding:10px 12px 12px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.pm-cat-models{display:flex;flex-wrap:wrap;gap:5px}
+.pm-cat-models .cb-opt{border:1px solid var(--border);background:var(--panel2);border-radius:999px;font-size:11.5px;padding:4px 9px}
+.pm-cat-models .cb-opt.mb-sel{border-color:var(--accent)}
+.pm-cat-foot{padding:7px 12px 10px;border-top:1px solid var(--border)}
+/* --- home / start menu --- */
+#homeView{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 260px);padding:14px 0}
+.home{width:100%;max-width:840px;margin:0 auto;text-align:center}
+.home .eyebrow{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:var(--accent);margin-bottom:16px;padding:4px 12px;border:1px solid var(--border2);border-radius:999px;background:var(--panel);animation:fadeUp .4s ease-out both}
+.home .eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.home h2{margin:0 0 12px;font-size:30px;line-height:1.15;letter-spacing:-.2px;font-weight:680;animation:fadeUp .45s ease-out .04s both}
+.home .lead{color:var(--muted);font-size:13.5px;line-height:1.6;max-width:54ch;margin:0 auto 32px;animation:fadeUp .45s ease-out .08s both}
+.home-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;text-align:left}
+.option{position:relative;width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:9px;text-align:left;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:22px 22px 18px;color:var(--text);font:inherit;cursor:pointer;overflow:hidden;transition:border-color .16s,background .16s,transform .16s,box-shadow .16s}
+.option:nth-child(1){animation:fadeUpIn .5s ease-out .12s both}
+.option:nth-child(2){animation:fadeUpIn .5s ease-out .22s both}
+.option .opt-ico{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border2);border-radius:11px;background:var(--panel2);color:var(--muted);transition:border-color .16s,color .16s,background .16s,transform .16s}
+.option .opt-ico svg{width:20px;height:20px;display:block}
+.option::after{content:"\2192";position:absolute;top:22px;right:22px;font-size:18px;line-height:1;color:var(--muted);transition:color .16s,transform .16s}
+.option:hover{border-color:var(--accent);background:var(--panel2);transform:translateY(-3px);box-shadow:0 16px 38px rgba(0,0,0,.42),0 0 0 1px var(--accent-dim)}
+.option:hover .opt-ico{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);transform:scale(1.06)}
+.option:hover::after{color:var(--accent);transform:translateX(5px)}
+.option:active:not(.disabled){transform:translateY(-1px)}
+.option:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.option .opt-kicker{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:1.1px;color:var(--accent)}
+.option .opt-title{font-size:18px;font-weight:650;font-family:var(--mono)}
+.option .opt-desc{color:var(--muted);font-size:12.5px;line-height:1.5;max-width:36ch}
+.option .opt-meta{font-family:var(--mono);font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;margin-top:auto;width:100%}
+.option .opt-hint{font-family:var(--mono);font-size:11px;color:var(--danger);width:100%}
+.option.disabled{cursor:not-allowed;opacity:.55;border-style:dashed}
+.option.disabled .opt-ico{border-style:dashed}
+.option.disabled::after{content:"\2014"}
+.option.disabled:hover{transform:none;border-color:var(--border);background:var(--panel);box-shadow:none}
+.option.disabled:hover .opt-ico{transform:none;border-color:var(--border2);color:var(--muted);background:var(--panel2)}
+.option.disabled:hover::after{color:var(--muted);transform:none}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes fadeUpIn{from{opacity:0;transform:translateY(12px) scale(.99)}to{opacity:1;transform:none}}
+@media(max-width:640px){
+  #homeView{min-height:calc(100vh - 220px)}
+  .home h2{font-size:23px}
+  .home-options{grid-template-columns:1fr}
+  .cards{grid-template-columns:1fr}
+  .srow{gap:8px}
+  .sname{font-size:10px}
+  .smodel{font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;transition-duration:.001ms!important}
+}
 </style>
 </head>
 <body>
@@ -761,10 +862,33 @@ footer{margin-top:26px;padding-top:12px;border-top:1px solid var(--border);color
   </header>
   <div id="errorBanner" class="errorbox" hidden></div>
   <main>
-    <section id="listView">
+    <section id="homeView">
+      <div class="home">
+        <div class="eyebrow">Start here</div>
+        <h2>What do you want to manage?</h2>
+        <p class="lead">Pick an area below. Presets define which model each agent uses; Provider Models control the model list available in opencode.jsonc.</p>
+        <div class="home-options">
+          <button type="button" class="option" data-action="go-presets" aria-label="Manage presets">
+            <span class="opt-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="18" cy="18" r="2.4"/></svg></span>
+            <span class="opt-kicker">Agent config</span>
+            <span class="opt-title">Presets</span>
+            <span class="opt-desc">Create, edit and activate agent presets.</span>
+            <span class="opt-meta" id="homePresetMeta">presets &middot; model, variant, skills, MCPs</span>
+          </button>
+          <button type="button" class="option" data-action="pm-open" id="homeProviderOption" aria-label="Manage provider models">
+            <span class="opt-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.6"/><rect x="3" y="14" width="18" height="6" rx="1.6"/><path d="M7 7h.01M7 17h.01"/></svg></span>
+            <span class="opt-kicker">opencode.jsonc</span>
+            <span class="opt-title">Provider Models</span>
+            <span class="opt-desc">Manage the model list for your provider in opencode.jsonc.</span>
+            <span class="opt-meta" id="homeProviderMeta">model list &middot; add or remove models</span>
+          </button>
+        </div>
+      </div>
+    </section>
+    <section id="listView" hidden>
       <div class="toolbar">
+        <button class="btn" data-action="home">&larr; Home</button>
         <button class="btn primary" data-action="add">+ Add preset</button>
-        <button class="btn" data-action="pm-open" id="pmOpenBtn" hidden>Provider Models</button>
         <span class="muted" id="countInfo"></span>
       </div>
       <div class="cards" id="cards"></div>
@@ -797,7 +921,7 @@ footer{margin-top:26px;padding-top:12px;border-top:1px solid var(--border);color
     </section>
     <section id="providerModelsView" hidden>
       <div class="pm-toolbar">
-        <button class="btn" data-action="pm-back">&larr; Back</button>
+        <button class="btn" data-action="pm-back">&larr; Home</button>
         <h2 style="margin:0;font-size:16px;font-weight:600">Provider Models</h2>
         <span class="muted" id="pmProviderName"></span>
         <span class="pm-badge" id="pmBadge">opencode.jsonc</span>
@@ -856,30 +980,49 @@ function renderList(){
   if(!config){wrapEl.innerHTML="";$("#countInfo").textContent="";return;}
   const names=Object.keys(config.presets||{});
   $("#countInfo").textContent=names.length+" preset"+(names.length===1?"":"s");
+  if(!names.length){
+    wrapEl.innerHTML='<div class="emptycards">'+
+      '<span class="e-ico" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.4"/><path d="M3 9h18M8 14h8"/></svg></span>'+
+      '<h3>No presets yet</h3>'+
+      '<p>Presets let you switch the model, variant, skills and MCPs for every agent at once. Create your first one to get started.</p>'+
+      '<button class="btn primary" data-action="add">+ Add preset</button>'+
+      '</div>';
+    return;
+  }
   wrapEl.innerHTML=names.map(n=>{
     const p=(config.presets||{})[n]||{};
     const isActive=config.preset===n;
     const ags=AGENTS.filter(a=>p[a]);
-    const ln=ags.slice(0,4).map(a=>a+" \u2192 "+esc(p[a].model||"\u2014")+(p[a].variant?" \u00b7 "+esc(p[a].variant):""));
-    if(ags.length>4)ln.push("+"+(ags.length-4)+" more agents");
+    const shown=ags.slice(0,4);
+    const rows=shown.length?shown.map(a=>{
+      const model=p[a].model||"";
+      const variant=p[a].variant||"";
+      const modelHtmlTxt=model?modelHtml(model):'<span class="cb-raw" style="color:var(--muted);font-style:italic">no model</span>';
+      return '<div class="srow"><span class="sname">'+esc(a)+'</span><span class="smodel">'+
+        '<span class="smodelTxt"'+(model?' title="'+esc(model)+'"':"")+'>'+modelHtmlTxt+'</span>'+
+        (variant?'<span class="svar" title="variant: '+esc(variant)+'">'+esc(variant)+'</span>':"")+'</span></div>';
+    }).join(""):'<div class="srow"><span class="sname">agents</span><span class="smodel"><span class="smodelTxt" style="color:var(--muted);font-style:italic">empty preset</span></span></div>';
+    const more=ags.length>4?'<div class="smore">+'+(ags.length-4)+' more agent'+(ags.length-4===1?"":"s")+'</div>':"";
     let extra="";
     if(confirmState&&confirmState.name===n&&confirmState.type==="delete"){
-      extra='<div class="confirmbar">Delete <b>'+esc(n)+'</b>? A backup is written automatically. '+
+      extra='<div class="confirmbar" role="alertdialog" aria-label="Confirm delete preset">'+
+        '<span>Delete <b>'+esc(n)+'</b>? A backup is written automatically.</span>'+
         '<button class="btn danger" data-action="del-go" data-name="'+esc(n)+'">Delete</button>'+
         '<button class="btn" data-action="del-cancel">Cancel</button></div>';
     }else if(confirmState&&confirmState.name===n&&confirmState.type==="dup"){
-      extra='<div class="confirmbar neutral"><input class="dupname" placeholder="new-preset-name" spellcheck="false">'+
+      extra='<div class="confirmbar neutral"><label style="flex:1;min-width:160px;flex-direction:column">New preset name'+
+        '<input class="dupname" placeholder="new-preset-name" spellcheck="false" aria-label="New preset name"></label>'+
         '<button class="btn primary" data-action="dup-go" data-name="'+esc(n)+'">Create copy</button>'+
         '<button class="btn" data-action="dup-cancel">Cancel</button></div>';
     }
-    return '<article class="card'+(isActive?" activecard":"")+'">'+
-      '<div class="head"><h3>'+esc(n)+'</h3>'+(isActive?'<span class="badge active">active</span>':"")+'</div>'+
-      '<div class="summary">'+(ln.length?ln.join("\n"):"(empty preset)")+'</div>'+
+    return '<article class="card'+(isActive?" activecard":"")+'" data-name="'+esc(n)+'">'+
+      '<div class="head"><h3>'+esc(n)+'</h3>'+(isActive?'<span class="badge active" title="This preset is currently active">active</span>':"")+'</div>'+
+      '<div class="summary">'+rows+more+'</div>'+
       '<div class="row">'+
       (isActive?"":'<button class="btn primary" data-action="activate" data-name="'+esc(n)+'">Activate</button>')+
-      '<button class="btn" data-action="edit" data-name="'+esc(n)+'">Edit</button>'+
-      '<button class="btn" data-action="duplicate" data-name="'+esc(n)+'">Duplicate</button>'+
-      '<button class="btn danger" data-action="delete" data-name="'+esc(n)+'"'+(isActive?' disabled title="Active preset \u2014 activate another first"':'')+'>Delete</button>'+
+      '<button class="btn" data-action="edit" data-name="'+esc(n)+'" aria-label="Edit preset '+esc(n)+'">Edit</button>'+
+      '<button class="btn" data-action="duplicate" data-name="'+esc(n)+'" aria-label="Duplicate preset '+esc(n)+'">Duplicate</button>'+
+      '<button class="btn danger" data-action="delete" data-name="'+esc(n)+'"'+(isActive?' disabled title="Active preset — activate another preset first" aria-label="Delete preset '+esc(n)+' (disabled: preset is active)"':' aria-label="Delete preset '+esc(n)+'"')+'>Delete</button>'+
       '</div>'+extra+'</article>';
   }).join("");
   const dup=document.querySelector(".dupname");
@@ -887,8 +1030,90 @@ function renderList(){
 }
 /* ---- provider models view state ---- */
 let pmProvider="omniroute", pmModels={}, pmHasOpencodeJsonc=false;
+let pmCatalogOpen=false, pmQuery="", pmActive=-1, pmCatQuery="", pmCatProvider="", pmCatShowAll=false;
+const PM_CAP=8, PM_CAT_CAP=48;
+let pmSuggestions=[];
+
+/* Fully qualified catalog list: {full,provider,raw}. */
+function pmCatalogList(){
+  const out=[];
+  const src=providerModels||{};
+  Object.keys(src).forEach(prov=>{
+    (src[prov]||[]).forEach(raw=>{out.push({full:prov+"/"+raw,provider:prov,raw:raw});});
+  });
+  return out;
+}
+function pmFilteredCatalog(){
+  const q=pmQuery.trim().toLowerCase();
+  return pmCatalogList().filter(it=>!q||it.full.toLowerCase().includes(q));
+}
+function pmShowAutocomplete(){
+  const ac=$("#pmAc");if(!ac)return;
+  const inp=$("#pmAddInput");
+  const q=pmQuery.trim();
+  if(!q){ac.hidden=true;ac.innerHTML="";pmSuggestions=[];pmActive=-1;if(inp){inp.setAttribute("aria-expanded","false");inp.removeAttribute("aria-activedescendant");}return;}
+  const all=pmFilteredCatalog();
+  const shown=all.slice(0,PM_CAP);
+  pmSuggestions=shown.map(it=>it.full);
+  if(pmActive>=pmSuggestions.length)pmActive=pmSuggestions.length?pmSuggestions.length-1:-1;
+  let html="";
+  if(!pmCatalogList().length){
+    html='<div class="pm-ac-hint">Catalog unavailable (models.dev not loaded). Press Add to use the id as-is.</div>';
+  }else if(!all.length){
+    html='<div class="pm-ac-hint">No catalog match for &ldquo;'+esc(q)+'&rdquo;. Press Add to use it as-is.</div>';
+  }else{
+    html='<div class="pm-ac-head">Suggestions</div>';
+    shown.forEach((it,i)=>{
+      const added=!!pmModels[it.full];
+      html+='<div class="cb-opt'+(added?" mb-sel":"")+(i===pmActive?" kb-active":"")+'" id="pm-ac-opt-'+i+'" role="option" aria-selected="'+(i===pmActive)+'" data-pm-sug="'+esc(it.full)+'">'+
+        (added?'<span class="cb-check">\u2713 </span>':"")+modelHtml(it.full)+'</div>';
+    });
+    if(all.length>shown.length){
+      html+='<button type="button" class="cb-more" data-pm-ac-more="1">Show all \u2014 '+(all.length-shown.length)+' more match'+(all.length-shown.length===1?"":"es")+'</button>';
+    }
+  }
+  ac.innerHTML=html;
+  ac.hidden=false;
+  if(inp){inp.setAttribute("aria-expanded","true");pmApplyAcActive();}
+}
+function pmApplyAcActive(){
+  const ac=$("#pmAc");if(!ac||ac.hidden)return;
+  ac.querySelectorAll(".cb-opt.kb-active").forEach(el=>el.classList.remove("kb-active"));
+  const inp=$("#pmAddInput");
+  if(pmActive>=0&&pmSuggestions[pmActive]!==undefined){
+    const el=ac.querySelector('.cb-opt[data-pm-sug="'+CSS.escape(pmSuggestions[pmActive])+'"]');
+    if(el){el.classList.add("kb-active");el.scrollIntoView({block:"nearest"});
+      if(inp)inp.setAttribute("aria-activedescendant","pm-ac-opt-"+pmActive);}
+  }else if(inp){inp.removeAttribute("aria-activedescendant");}
+}
+function pmHideAutocomplete(){
+  const ac=$("#pmAc");if(ac){ac.hidden=true;ac.innerHTML="";}
+  pmActive=-1;pmSuggestions=[];
+  const inp=$("#pmAddInput");
+  if(inp){inp.setAttribute("aria-expanded","false");inp.removeAttribute("aria-activedescendant");}
+}
+/* Add one fully qualified id; returns false when blank or already present. */
+function pmCommit(full){
+  if(!full)return false;
+  if(pmModels[full]){toast("Model already in list","error");return false;}
+  pmModels[full]={name:full};
+  renderPMModels();
+  pmMarkCatalogItem(full,true);
+  return true;
+}
+/* Reflect added/available state on a catalog chip without rebuilding the catalog. */
+function pmMarkCatalogItem(full,added){
+  const el=document.querySelector('#pmCatalog [data-pm-cat-add="'+CSS.escape(full)+'"]');
+  if(!el)return;
+  el.classList.toggle("mb-sel",added);
+  el.title=(added?"Already added":"Add ")+full;
+  const check=el.querySelector(".cb-check");
+  if(added&&!check)el.insertAdjacentHTML("afterbegin",'<span class="cb-check">\u2713 </span>');
+  else if(!added&&check)check.remove();
+}
 
 async function loadProviderModelsView(){
+  pmCatalogOpen=false;pmQuery="";pmCatQuery="";pmCatProvider="";pmCatShowAll=false;
   try{
     const res=await fetch("/api/opencode-config");
     const data=await res.json();
@@ -906,37 +1131,137 @@ async function loadProviderModelsView(){
   }catch(e){toast("Cannot load opencode.jsonc: "+e.message,"error");}
 }
 
+/* Full (re)build of the view shell. Only called on load; add/remove update in place. */
 function renderProviderModelsView(){
   const content=$("#pmContent");if(!content)return;
   const provNameEl=$("#pmProviderName");
   if(provNameEl)provNameEl.textContent=pmProvider;
   const modelEntries=Object.entries(pmModels);
   let html='<div class="pm-provider">'+
-    '<h3>'+esc(pmProvider)+' <span class="muted" style="font-size:11px;text-transform:none;letter-spacing:0">('+modelEntries.length+' model'+(modelEntries.length!==1?"s":"")+')</span></h3>'+
-    '<div class="pm-model-list">';
-  if(!modelEntries.length){
-    html+='<span class="pm-empty">No models declared yet. Add models below.</span>';
-  }else{
-    modelEntries.forEach(([mid,meta])=>{
-      html+='<span class="pm-chip" data-pm-remove="'+esc(mid)+'">'+esc(mid)+' <span class="pm-remove">&times;</span></span>';
-    });
-  }
-  html+='</div>';
-  html+='<div class="pm-add-section">'+
-    '<input id="pmAddInput" type="text" placeholder="Add model ID (e.g. cmd/MiniMaxAI/MiniMax-M3)" spellcheck="false" autocomplete="off">'+
-    '<button class="btn primary" data-action="pm-add">Add</button>'+
-    '<button class="btn" data-action="pm-add-from-browser">From catalog</button>'+
+    '<h3>'+esc(pmProvider)+' <span class="muted" id="pmCount" style="font-size:11px;text-transform:none;letter-spacing:0">('+modelEntries.length+' model'+(modelEntries.length!==1?"s":"")+')</span></h3>'+
+    '<div class="pm-model-list" id="pmModelList"></div>'+
+    '<div class="pm-add-section">'+
+    '<div class="pm-add-wrap">'+
+    '<input id="pmAddInput" type="text" placeholder="Type a model id (e.g. MiniMax) or paste one" spellcheck="false" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="pmAc" aria-autocomplete="list" aria-label="Add model id">'+
+    '<div class="pm-ac" id="pmAc" hidden></div>'+
     '</div>'+
-    '<div id="pmCatalog" style="margin-top:12px"></div>'+
+    '<button class="btn primary" data-action="pm-add">Add</button>'+
+    '<button class="btn" data-action="pm-toggle-cat" id="pmCatToggle" aria-expanded="false">Browse catalog</button>'+
+    '</div>'+
+    '<div id="pmCatalog"></div>'+
     '</div>';
   html+='<div style="margin-top:14px;display:flex;gap:8px">'+
     '<button class="btn primary" data-action="pm-save">Save to opencode.jsonc</button>'+
     '<button class="btn" data-action="pm-back">Cancel</button>'+
     '</div>';
   content.innerHTML=html;
+  renderPMModels();
+  pmRenderCatalog();
+}
+/* In-place refresh of the chip list + count (never touches the input). */
+function renderPMModels(){
+  const list=$("#pmModelList");if(!list)return;
+  const ids=Object.keys(pmModels);
+  if(!ids.length){
+    list.innerHTML='<span class="pm-empty">No models declared yet. Add models below.</span>';
+  }else{
+    list.innerHTML=ids.map(mid=>'<span class="pm-chip" data-pm-remove="'+esc(mid)+'" title="Click to remove">'+esc(mid)+' <span class="pm-remove">&times;</span></span>').join("");
+  }
+  const c=$("#pmCount");
+  if(c)c.textContent="("+ids.length+" model"+(ids.length!==1?"s":"")+")";
+}
+/* Catalog: provider pills select which provider's model panel is shown.
+   Regions (#pmCatTabs / #pmCatPanel / #pmCatFoot) are updated surgically so the
+   search input, its focus/caret, and the page scroll position are never disturbed. */
+function pmRenderCatalog(){
+  const host=$("#pmCatalog");if(!host)return;
+  const tgl=$("#pmCatToggle");
+  if(tgl){tgl.textContent=pmCatalogOpen?"Hide catalog":"Browse catalog";tgl.setAttribute("aria-expanded",String(pmCatalogOpen));}
+  if(!pmCatalogOpen){
+    host.innerHTML="";
+    if(tgl)tgl.hidden=false;
+    return;
+  }
+  const all=pmCatalogList();
+  if(!all.length){
+    host.innerHTML='<div class="pm-cat"><div class="pm-cat-panel"><span class="pm-empty">No catalog available. Ensure models.dev is reachable.</span></div></div>';
+    return;
+  }
+  const provs=[...new Set(all.map(it=>it.provider))].sort((a,b)=>a.localeCompare(b));
+  if(!pmCatProvider||provs.indexOf(pmCatProvider)<0)pmCatProvider=provs[0];
+  /* Build the shell only if it is not already present (keeps #pmCatSearch alive). */
+  if(!$("#pmCatTabs")){
+    host.innerHTML='<div class="pm-cat">'+
+      '<div class="pm-cat-search"><input id="pmCatSearch" type="text" placeholder="Filter models in selected provider..." spellcheck="false" autocomplete="off" aria-label="Filter catalog" value="'+esc(pmCatQuery)+'"></div>'+
+      '<div class="pm-cat-tabs" id="pmCatTabs" role="tablist" aria-label="Catalog providers"></div>'+
+      '<div class="pm-cat-panel" id="pmCatPanel" role="tabpanel" aria-live="polite"></div>'+
+      '<div class="pm-cat-foot" id="pmCatFoot"></div>'+
+      '</div>';
+    const cs=$("#pmCatSearch");
+    if(cs)cs.value=pmCatQuery;
+  }
+  pmRenderPills();
+  pmRenderPanel();
+  pmRenderFoot();
+}
+function pmRenderPills(){
+  const tabs=$("#pmCatTabs");if(!tabs)return;
+  const q=pmCatQuery.trim().toLowerCase();
+  const all=pmCatalogList();
+  const counts=new Map();
+  all.forEach(it=>counts.set(it.provider,(counts.get(it.provider)||0)+1));
+  const provs=[...counts.keys()].sort((a,b)=>a.localeCompare(b));
+  tabs.innerHTML=provs.map(prov=>{
+    const on=prov===pmCatProvider;
+    const n=counts.get(prov)||0;
+    const matches=q?all.filter(it=>it.provider===prov&&it.full.toLowerCase().includes(q)).length:null;
+    const dim=q&&matches===0;
+    return '<button type="button" class="pm-cat-pill'+(on?" on":"")+(dim?" dim":"")+'" role="tab" data-pm-provider="'+esc(prov)+'" aria-selected="'+on+'" tabindex="'+(on?"0":"-1")+'">'+
+      esc(prov)+' <span class="pcount">'+(q?matches:n)+'</span></button>';
+  }).join("");
+}
+function pmRenderPanel(keepScroll){
+  const panel=$("#pmCatPanel");if(!panel)return;
+  const prevTop=keepScroll?panel.scrollTop:0;
+  const q=pmCatQuery.trim().toLowerCase();
+  if(!pmCatProvider){panel.innerHTML='<span class="pm-empty">Select a provider above.</span>';return;}
+  const items=pmCatalogList().filter(it=>it.provider===pmCatProvider&&(!q||it.full.toLowerCase().includes(q)));
+  if(!items.length){
+    panel.innerHTML='<span class="pm-empty">'+(q?'No models match &ldquo;'+esc(pmCatQuery)+'&rdquo; in '+esc(pmCatProvider)+'.':'No models for this provider.')+'</span>';
+    return;
+  }
+  const shown=pmCatShowAll?items:items.slice(0,PM_CAT_CAP);
+  let html='<div class="pm-cat-models">';
+  shown.forEach(it=>{
+    const added=!!pmModels[it.full];
+    html+='<span class="cb-opt'+(added?" mb-sel":"")+'" role="button" tabindex="0" data-pm-cat-add="'+esc(it.full)+'" title="'+(added?"Already added":"Add ")+esc(it.full)+'">'+
+      (added?'<span class="cb-check">\u2713 </span>':"")+modelHtml(it.full)+'</span>';
+  });
+  html+='</div>';
+  if(!pmCatShowAll&&items.length>shown.length){
+    html+='<button type="button" class="cb-more" data-pm-show-all="1">Show all \u2014 '+items.length+' models</button>';
+  }else if(pmCatShowAll&&items.length>PM_CAT_CAP){
+    html+='<button type="button" class="cb-more" data-pm-show-less="1">Show fewer</button>';
+  }
+  panel.innerHTML=html;
+  panel.scrollTop=prevTop;
+}
+function pmRenderFoot(){
+  const foot=$("#pmCatFoot");if(!foot)return;
+  const q=pmCatQuery.trim().toLowerCase();
+  const all=pmCatalogList();
+  const inProv=all.filter(it=>it.provider===pmCatProvider).length;
+  let txt=inProv+' model'+(inProv===1?"":"s")+' in '+esc(pmCatProvider);
+  if(q){
+    const others=all.filter(it=>it.provider!==pmCatProvider&&it.full.toLowerCase().includes(q)).length;
+    txt+=' &middot; &ldquo;'+esc(pmCatQuery)+'&rdquo;';
+    if(others)txt+=' &middot; '+others+' match'+(others===1?"":"es")+' in other providers';
+  }
+  foot.innerHTML='<span class="muted">'+txt+'</span>';
 }
 
 function showView(view){
+  $("#homeView").hidden=view!=="home";
   $("#listView").hidden=view!=="list";
   $("#editorView").hidden=view!=="editor";
   $("#providerModelsView").hidden=view!=="providerModels";
@@ -947,19 +1272,34 @@ async function pmAddModel(){
   const inp=$("#pmAddInput");
   const mid=inp?inp.value.trim():"";
   if(!mid){toast("Enter a model ID","error");return;}
-  if(pmModels[mid]){toast("Model already in list","error");return;}
-  pmModels[mid]={name:mid};
-  renderProviderModelsView();
-  if(inp)inp.value="";
+  let value=mid;
+  if(mid.indexOf("/")<0){
+    const q=mid.toLowerCase();
+    const matches=pmCatalogList().filter(it=>it.raw.toLowerCase().includes(q)||it.full.toLowerCase().includes(q));
+    if(matches.length===1)value=matches[0].full;
+  }
+  if(!pmCommit(value))return;
+  pmQuery="";
+  if(inp){inp.value="";}
+  pmHideAutocomplete();
+  if(inp)inp.focus();
 }
 
 async function pmSave(){
   try{
     const res=await api("/api/opencode-provider-models",{provider:pmProvider,models:pmModels});
-    if(res.ok){toast("Provider models saved to opencode.jsonc");loadConfig();showView("list");}
+    if(res.ok){toast("Provider models saved to opencode.jsonc");loadConfig();showView("home");}
     else{toast(res.error||"Failed to save","error");}
   }catch(e){toast("Error: "+e.message,"error");}
 }
+
+/* ---- split-view editor state + model catalog ---- */
+const MB_CAP_NOQ=30,MB_CAP_Q=200;
+const cbData={models:[],variants:[],groups:[]};
+let activeAgent=AGENTS[0];
+let mbState={q:"",showAll:false,provider:"",flat:[],active:-1};
+let edState=null;
+let customOpen=false;
 
 function rebuildDatalists(){
   const models=new Set(),variants=new Set(["low","medium","high","max"]);
@@ -985,12 +1325,16 @@ function modelHtml(v){
   if(i>0)return '<span class="cb-prov">'+esc(v.slice(0,i+1))+'</span><span class="cb-raw">'+esc(v.slice(i+1))+'</span>';
   return esc(v);
 }
+function mbProviderOf(v){
+  const i=v.indexOf("/");
+  return i<0?"(other)":v.slice(0,i);
+}
 function ensureEdState(){
   if(edState)return;
   edState={};
   AGENTS.forEach(ag=>{edState[ag]={model:"",variant:"",skills:"",mcps:""};});
   activeAgent=AGENTS[0];
-  mbState={q:"",showAll:false,flat:[],active:-1};
+  mbState={q:"",showAll:false,provider:"",flat:[],active:-1};
 }
 function openEditor(name,tplAgents){
   editing=name||null;dirty=false;confirmState=null;
@@ -1005,7 +1349,7 @@ function openEditor(name,tplAgents){
     edState[ag]={model:a.model||"",variant:a.variant||"",skills:(a.skills||[]).join("\n"),mcps:(a.mcps||[]).join("\n")};
   });
   activeAgent=AGENTS[0];
-  mbState={q:"",showAll:false,flat:[],active:-1};
+  mbState={q:"",showAll:false,provider:"",flat:[],active:-1};
   customOpen=false;
   $("#unsaved").hidden=true;
   rebuildDatalists();
@@ -1041,8 +1385,9 @@ function paneHtml(){
     '<div class="pane-block">'+
       '<div class="pane-label"><span>Model</span><span class="muted">click = assign &amp; next agent &middot; &uarr;/&darr; + Enter</span></div>'+
       '<div class="mb-wrap" id="mbWrap">'+
-        '<div class="mb-search"><input id="mbSearch" type="text" placeholder="Filter models (provider or id)..." spellcheck="false" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="mbList" aria-autocomplete="list"></div>'+
-        '<div class="mb-list" id="mbList" role="listbox" aria-label="Models"></div>'+
+        '<div class="mb-search"><input id="mbSearch" type="text" placeholder="Filter models in selected provider..." spellcheck="false" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="mbList" aria-autocomplete="list"></div>'+
+        '<div class="mb-tabs" id="mbTabs" role="tablist" aria-label="Model providers"></div>'+
+        '<div class="mb-list" id="mbList" role="tabpanel" aria-live="polite" aria-label="Models"></div>'+
       '</div>'+
     '</div>'+
     '<div class="pane-block">'+
@@ -1066,6 +1411,8 @@ function paneHtml(){
 function renderPane(){
   const pane=$("#agentPane");if(!pane)return;
   pane.innerHTML=paneHtml();
+  const provs=cbData.groups.map(g=>g[0]);
+  if(!mbState.provider||provs.indexOf(mbState.provider)<0)mbState.provider=mbDefaultProvider();
   mbState.flat=[];
   mbState.active=-1;
   renderMb();
@@ -1077,39 +1424,62 @@ function mbSyncActiveToSelection(){
   const i=mbState.flat.indexOf(v);
   mbSetActive(i);
 }
-function mbFilteredGroups(){
-  const q=mbState.q.toLowerCase();
-  const out=[];
-  cbData.groups.forEach(([g,items])=>{
-    const shown=q?items.filter(v=>v.toLowerCase().indexOf(q)>=0):items;
-    if(shown.length)out.push([g,shown]);
-  });
-  return out;
+function mbDefaultProvider(){
+  const m=edState[activeAgent].model;
+  const p=m?mbProviderOf(m):"";
+  const provs=cbData.groups.map(g=>g[0]);
+  if(p&&provs.indexOf(p)>=0)return p;
+  return provs[0]||"";
 }
-function renderMb(){
+function mbRenderPills(){
+  const tabs=$("#mbTabs");if(!tabs)return;
+  const q=mbState.q.trim().toLowerCase();
+  tabs.innerHTML=cbData.groups.map(([g,items])=>{
+    const on=g===mbState.provider;
+    const matches=q?items.filter(v=>v.toLowerCase().indexOf(q)>=0).length:null;
+    const dim=q&&matches===0;
+    return '<button type="button" class="pm-cat-pill'+(on?" on":"")+(dim?" dim":"")+'" role="tab" data-mb-provider="'+esc(g)+'" aria-selected="'+on+'" tabindex="'+(on?"0":"-1")+'">'+
+      esc(g)+' <span class="pcount">'+(q?matches:items.length)+'</span></button>';
+  }).join("");
+}
+function renderMb(keepScroll){
   const listEl=$("#mbList");if(!listEl)return;
-  const q=mbState.q;
-  const groups=mbFilteredGroups();
-  const total=groups.reduce((n,g)=>n+g[1].length,0);
+  const prevTop=keepScroll?listEl.scrollTop:0;
+  mbRenderPills();
+  const q=mbState.q.trim().toLowerCase();
+  const group=cbData.groups.filter(g=>g[0]===mbState.provider)[0];
+  const items=group?group[1]:[];
+  const matches=q?items.filter(v=>v.toLowerCase().indexOf(q)>=0):items.slice();
   const cap=mbState.showAll?Infinity:(q?MB_CAP_Q:MB_CAP_NOQ);
+  const shown=matches.slice(0,cap);
   let html="",flat=[];
-  groups.forEach(([g,items])=>{
-    if(flat.length>=cap)return;
-    const shown=items.slice(0,cap-flat.length);
-    html+='<div class="cb-group"><span>'+esc(g)+'</span><span class="cb-count">'+items.length+" model"+(items.length===1?"":"s")+'</span></div>';
-    shown.forEach(v=>{
-      const sel=edState[activeAgent].model===v;
-      html+='<div class="cb-opt'+(sel?" mb-sel":"")+'" id="mb-opt-'+flat.length+'" role="option" aria-selected="'+sel+'" data-val="'+esc(v)+'">'+
-        (sel?'<span class="cb-check">\u2713 </span>':"")+modelHtml(v)+'</div>';
-      flat.push(v);
-    });
+  shown.forEach(v=>{
+    const sel=edState[activeAgent].model===v;
+    html+='<div class="cb-opt'+(sel?" mb-sel":"")+'" id="mb-opt-'+flat.length+'" role="option" aria-selected="'+sel+'" data-val="'+esc(v)+'" title="'+esc(v)+'">'+
+      (sel?'<span class="cb-check">\u2713 </span>':"")+modelHtml(v)+'</div>';
+    flat.push(v);
   });
-  let hidden=total-flat.length;
-  if(hidden>0&&!mbState.showAll)html+='<button type="button" class="cb-more" data-cbmore="1">Show all \u2014 '+hidden+' more model'+(hidden===1?"":"s")+'</button>';
-  if(!flat.length)html='<div class="cb-empty">No matches for \u201c'+esc(q)+'\u201d</div>';
+  const hidden=matches.length-flat.length;
+  const baseCap=q?MB_CAP_Q:MB_CAP_NOQ;
+  let out='<div class="mb-chips" role="listbox" aria-label="Models">'+html+'</div>';
+  if(!flat.length){
+    if(q){
+      let others=0;
+      cbData.groups.forEach(([g,it])=>{if(g!==mbState.provider)others+=it.filter(v=>v.toLowerCase().indexOf(q)>=0).length;});
+      out='<div class="cb-empty">No matches for \u201c'+esc(mbState.q)+'\u201d in '+esc(mbState.provider)+'.'+
+        (others?' '+others+' match'+(others===1?"":"es")+' in other providers.':'')+'</div>';
+    }else{
+      out='<div class="cb-empty">No models for this provider.</div>';
+    }
+  }else if(hidden>0&&!mbState.showAll){
+    out+='<button type="button" class="cb-more" data-cbmore="1">Show all \u2014 '+hidden+' more model'+(hidden===1?"":"s")+'</button>';
+  }else if(mbState.showAll&&matches.length>baseCap){
+    out+='<button type="button" class="cb-more" data-cbmore-less="1">Show fewer</button>';
+  }
   mbState.flat=flat;
   if(mbState.active>=flat.length)mbState.active=flat.length-1;
-  listEl.innerHTML=html;
+  listEl.innerHTML=out;
+  listEl.scrollTop=prevTop;
   mbApplyActive();
 }
 function mbApplyActive(){
@@ -1140,6 +1510,7 @@ function setActiveAgent(ag,opts){
   opts=opts||{};
   activeAgent=ag;
   mbState.showAll=false;
+  mbState.provider="";
   customOpen=false;
   const wrap=$("#mbWrap");
   if(opts.keepScroll&&wrap){
@@ -1281,16 +1652,47 @@ document.addEventListener("click",async e=>{
       confirmState=null;await doDuplicate(name,newName);
     }
     else if(act==="back")onBack();
+    else if(act==="home")showView("home");
+    else if(act==="go-presets")showView("list");
     else if(act==="save")await saveEditor();
   }catch(err){toast(err.message,"error");}
 });
 window.addEventListener("beforeunload",e=>{
   if(dirty){e.preventDefault();e.returnValue="";}
 });
+document.addEventListener("keydown",async e=>{
+  const inp=e.target.closest?e.target.closest(".dupname"):null;
+  if(!inp)return;
+  if(e.key==="Enter"){
+    e.preventDefault();
+    const bar=inp.closest(".confirmbar");
+    const btn=bar&&bar.querySelector('[data-action="dup-go"]');
+    if(btn)btn.click();
+  }else if(e.key==="Escape"){
+    e.preventDefault();
+    const bar=inp.closest(".confirmbar");
+    const btn=bar&&bar.querySelector('[data-action="dup-cancel"]');
+    if(btn)btn.click();
+  }
+});
 $("#agentsGrid").addEventListener("click",e=>{
   const row=e.target.closest(".agent-row");
   if(row){setActiveAgent(row.dataset.agent);return;}
-  if(e.target.closest("[data-cbmore]")){mbState.showAll=true;renderMb();return;}
+  if(e.target.closest("[data-cbmore]")){mbState.showAll=true;renderMb(true);return;}
+  if(e.target.closest("[data-cbmore-less]")){mbState.showAll=false;renderMb(true);return;}
+  const pill=e.target.closest("[data-mb-provider]");
+  if(pill){
+    const g=pill.dataset.mbProvider;
+    if(g===mbState.provider)return;
+    mbState.provider=g;
+    mbState.showAll=false;
+    mbState.flat=[];
+    mbState.active=-1;
+    renderMb();
+    const on=$("#mbTabs .pm-cat-pill.on");
+    if(on){try{on.focus({preventScroll:true});}catch(err){on.focus();}}
+    return;
+  }
   const seg=e.target.closest("[data-seg]");
   if(seg){segSet(seg.dataset.seg);return;}
   if(e.target.closest("[data-allvariant]")){copyToAll("variant");return;}
@@ -1332,6 +1734,14 @@ $("#agentsGrid").addEventListener("keydown",e=>{
     }
   }else if(t.id==="variantCustom"&&e.key==="Enter"){
     e.preventDefault();t.blur();
+  }else if(t.closest&&t.closest("#mbTabs")&&(e.key==="ArrowRight"||e.key==="ArrowLeft")){
+    const pills=[...document.querySelectorAll("#mbTabs .pm-cat-pill")];
+    if(pills.length<2)return;
+    e.preventDefault();
+    const i=pills.indexOf(t.closest(".pm-cat-pill"));
+    if(i<0)return;
+    const ni=(i+(e.key==="ArrowRight"?1:-1)+pills.length)%pills.length;
+    pills[ni].click();
   }
 });
 ["input","change"].forEach(ev=>document.addEventListener(ev,e=>{
@@ -1345,54 +1755,143 @@ document.addEventListener("click",async e=>{
   const b=e.target.closest("[data-action]");
   if(!b)return;
   const act=b.dataset.action;
-  if(act==="pm-open"){loadProviderModelsView();return;}
-  if(act==="pm-back"){showView("list");return;}
+  if(act==="pm-open"){
+    if(!pmHasOpencodeJsonc){toast("opencode.jsonc not found — provider models unavailable","error");return;}
+    loadProviderModelsView();return;
+  }
+  if(act==="pm-back"){showView("home");return;}
   if(act==="pm-add"){await pmAddModel();return;}
-  if(act==="pm-add-from-browser"){pmShowCatalog();return;}
-  if(act==="pm-save"){await pmSave();return;}
-  if(act.startsWith("pm-remove")){
-    const mid=act.replace("pm-remove","");
-    delete pmModels[mid];
-    renderProviderModelsView();
+  if(act==="pm-toggle-cat"){
+    pmCatalogOpen=!pmCatalogOpen;
+    if(pmCatalogOpen)pmCatQuery="";
+    pmRenderCatalog();
     return;
   }
+  if(act==="pm-save"){await pmSave();return;}
 });
+/* Chips, catalog provider pills, catalog items. */
 document.addEventListener("click",e=>{
   const chip=e.target.closest("[data-pm-remove]");
   if(chip){
     const mid=chip.dataset.pmRemove;
     delete pmModels[mid];
-    renderProviderModelsView();
+    renderPMModels();
+    pmMarkCatalogItem(mid,false);
+    const inp=$("#pmAddInput");
+    if(inp)inp.focus();
+    return;
+  }
+  const pill=e.target.closest("[data-pm-provider]");
+  if(pill){
+    const prov=pill.dataset.pmProvider;
+    if(prov===pmCatProvider)return;
+    pmCatProvider=prov;
+    pmCatShowAll=false;
+    pmRenderPills();
+    pmRenderPanel();
+    pmRenderFoot();
+    const on=$("#pmCatTabs .pm-cat-pill.on");
+    if(on){try{on.focus({preventScroll:true});}catch(err){on.focus();}}
+    return;
+  }
+  if(e.target.closest("[data-pm-show-all]")){pmCatShowAll=true;pmRenderPanel(true);return;}
+  if(e.target.closest("[data-pm-show-less]")){pmCatShowAll=false;pmRenderPanel(true);return;}
+  const acMore=e.target.closest("[data-pm-ac-more]");
+  if(acMore){
+    const all=pmFilteredCatalog();
+    pmSuggestions=all.map(it=>it.full);
+    pmActive=-1;
+    let html='<div class="pm-ac-head">All matches</div>';
+    all.forEach((it,i)=>{
+      const added=!!pmModels[it.full];
+      html+='<div class="cb-opt'+(added?" mb-sel":"")+'" id="pm-ac-opt-'+i+'" role="option" aria-selected="false" data-pm-sug="'+esc(it.full)+'">'+(added?'<span class="cb-check">\u2713 </span>':"")+modelHtml(it.full)+'</div>';
+    });
+    const ac=$("#pmAc");
+    if(ac){ac.innerHTML=html;ac.hidden=false;}
+    return;
+  }
+  const sug=e.target.closest("[data-pm-sug]");
+  if(sug){
+    const full=sug.dataset.pmSug;
+    const inp=$("#pmAddInput");
+    if(!pmCommit(full))return;
+    pmQuery="";
+    if(inp){inp.value="";}
+    pmHideAutocomplete();
+    if(inp)inp.focus();
     return;
   }
   const catItem=e.target.closest("[data-pm-cat-add]");
   if(catItem){
     const mid=catItem.dataset.pmCatAdd;
-    if(!pmModels[mid]){pmModels[mid]={name:mid};renderProviderModelsView();}
+    if(pmModels[mid])return;
+    pmCommit(mid);
     return;
   }
 });
-
-function pmShowCatalog(){
-  const cat=$("#pmCatalog");if(!cat)return;
-  if(!providerModels||!Object.keys(providerModels).length){
-    cat.innerHTML='<span class="pm-empty">No catalog available. Ensure models.dev is reachable.</span>';
-    return;
+/* Live autocomplete + catalog filter on the provider view inputs. */
+document.addEventListener("input",e=>{
+  const t=e.target;
+  if(t.id==="pmAddInput"){
+    pmQuery=t.value;
+    pmActive=-1;
+    pmShowAutocomplete();
+  }else if(t.id==="pmCatSearch"){
+    pmCatQuery=t.value;
+    pmCatShowAll=false;
+    pmRenderPills();
+    pmRenderPanel();
+    pmRenderFoot();
   }
-  let html="";
-  const provs=Object.keys(providerModels).sort();
-  provs.forEach(prov=>{
-    const models=providerModels[prov]||[];
-    html+='<div style="margin-bottom:8px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:var(--accent);margin-bottom:4px">'+esc(prov)+'</div><div style="display:flex;flex-wrap:wrap;gap:4px">';
-    models.forEach(m=>{
-      const full=prov+"/"+m;
-      const sel=pmModels[full]?"mb-sel":"";
-      html+='<span class="cb-opt '+sel+'" data-pm-cat-add="'+esc(full)+'" style="font-size:11px;padding:4px 8px">'+esc(m)+'</span>';
-    });
-    html+='</div></div>';
-  });
-  cat.innerHTML=html;
-}
+});
+document.addEventListener("keydown",async e=>{
+  const t=e.target;
+  if(t.id==="pmAddInput"){
+    const ac=$("#pmAc");
+    const open=ac&&!ac.hidden;
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){
+      if(!open||!pmSuggestions.length)return;
+      e.preventDefault();
+      let i=pmActive;
+      if(i<0)i=e.key==="ArrowDown"?0:pmSuggestions.length-1;
+      else i=(i+(e.key==="ArrowDown"?1:-1)+pmSuggestions.length)%pmSuggestions.length;
+      pmActive=i;pmApplyAcActive();
+    }else if(e.key==="Enter"){
+      e.preventDefault();
+      if(open&&pmActive>=0&&pmSuggestions[pmActive]!==undefined){
+        const full=pmSuggestions[pmActive];
+        if(!pmCommit(full))return;
+        pmQuery="";t.value="";
+        pmHideAutocomplete();
+      }else{
+        await pmAddModel();
+      }
+    }else if(e.key==="Escape"){
+      if(open){e.preventDefault();pmHideAutocomplete();}
+    }
+  }else if(t.id==="pmCatSearch"&&e.key==="Escape"){
+    t.value="";pmCatQuery="";pmCatShowAll=false;pmRenderPills();pmRenderPanel();pmRenderFoot();t.focus();
+  }else if(t.closest&&t.closest("#pmCatTabs")&&(e.key==="ArrowRight"||e.key==="ArrowLeft")){
+    const pills=[...document.querySelectorAll("#pmCatTabs .pm-cat-pill")];
+    if(pills.length<2)return;
+    e.preventDefault();
+    const i=pills.indexOf(t.closest(".pm-cat-pill"));
+    if(i<0)return;
+    const ni=(i+(e.key==="ArrowRight"?1:-1)+pills.length)%pills.length;
+    pills[ni].click();
+  }else if((e.key==="Enter"||e.key===" ")&&t.closest&&t.closest("[data-pm-cat-add]")){
+    e.preventDefault();
+    t.click();
+  }
+});
+/* Click outside closes the autocomplete. */
+document.addEventListener("mousedown",e=>{
+  const ac=$("#pmAc");
+  if(!ac||ac.hidden)return;
+  if(e.target.closest(".pm-add-wrap"))return;
+  pmHideAutocomplete();
+});
+
 
 async function loadConfig(){
   try{
@@ -1402,10 +1901,23 @@ async function loadConfig(){
     else{config=data.config;configPath=data.configPath;backups=(data.backups||[]).length;providerModels=data.providers||{};pmHasOpencodeJsonc=data.hasOpencodeJsonc||false;clearError();}
   }catch(e){config=null;showError("Cannot reach server: "+e.message);}
   renderHeader();renderList();
-  const pmBtn=$("#pmOpenBtn");
-  if(pmBtn)pmBtn.hidden=!pmHasOpencodeJsonc;
+  const names=Object.keys((config&&config.presets)||{});
+  const presetMeta=$("#homePresetMeta");
+  if(presetMeta)presetMeta.textContent=names.length+" preset"+(names.length===1?"":"s")+" \u00b7 model, variant, skills, MCPs";
+  const provOpt=$("#homeProviderOption");
+  if(provOpt){
+    provOpt.classList.toggle("disabled",!pmHasOpencodeJsonc);
+    provOpt.disabled=!pmHasOpencodeJsonc;
+    const provMeta=$("#homeProviderMeta");
+    if(provMeta)provMeta.textContent=pmHasOpencodeJsonc?"model list \u00b7 add or remove models":"opencode.jsonc not found";
+    if(!pmHasOpencodeJsonc){
+      const hint=provOpt.querySelector(".opt-hint");
+      if(!hint){const h=document.createElement("span");h.className="opt-hint";h.textContent="Unavailable: no opencode.jsonc next to your config.";provOpt.appendChild(h);}
+    }
+  }
 }
 loadConfig();
+showView("home");
 </script>
 </body>
 </html>
