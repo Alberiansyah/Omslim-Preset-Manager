@@ -24,13 +24,15 @@ import json
 import os
 import re
 import shutil
+import subprocess
+import sys
 import tempfile
 import threading
 import time
 import urllib.request
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 AGENT_NAMES = [
     "orchestrator", "oracle", "librarian", "explorer",
@@ -414,8 +416,13 @@ def fetch_modelsdev():
 
 def read_proxy_settings(config_dir):
     """Best-effort: read baseURL/apiKey of the first OpenAI-compatible provider
-    from opencode.jsonc / opencode.json. Falls back to local OmniRoute proxy."""
-    base, key = "http://localhost:20128/v1", ""
+    from opencode.jsonc / opencode.json. Falls back to local OmniRoute proxy.
+
+    Returns (base, key, provider_name). provider_name is the name of the
+    declared provider whose baseURL was used, so live models fetched from that
+    endpoint can be attributed to that provider instead of a synthetic host
+    label (e.g. OmniRoute models must not land under "localhost")."""
+    base, key, pname = "http://localhost:20128/v1", "", ""
     for fname in ("opencode.jsonc", "opencode.json"):
         p = os.path.join(config_dir, fname)
         if not os.path.exists(p):
@@ -428,14 +435,15 @@ def read_proxy_settings(config_dir):
         providers = data.get("provider")
         if not isinstance(providers, dict):
             continue
-        for pdef in providers.values():
+        for name, pdef in providers.items():
             opts = pdef.get("options") if isinstance(pdef, dict) else None
             if isinstance(opts, dict) and opts.get("baseURL"):
                 base = str(opts["baseURL"]).rstrip("/")
                 key = str(opts.get("apiKey") or "")
+                pname = str(name)
                 break
         break
-    return base, key
+    return base, key, pname
 
 
 def fetch_live_models(config_dir):
@@ -443,7 +451,7 @@ def fetch_live_models(config_dir):
 
     Returns (models_dict_or_None, error_or_None). models_dict = {provider: [ids]}
     with the provider name derived from the baseURL host."""
-    base, key = read_proxy_settings(config_dir)
+    base, key, proxy_pname = read_proxy_settings(config_dir)
     url = base + "/models"
     req = urllib.request.Request(url)
     if key:
@@ -463,10 +471,14 @@ def fetch_live_models(config_dir):
             ids.append(str(mid))
     if not ids:
         return None, "Proxy returned no models"
-    # Derive a provider label from the proxy host, e.g. localhost:20128 -> "omniroute-like".
-    # Better: reuse the provider name(s) declared in opencode.jsonc that point at this baseURL.
+    # Attribute the live models to the provider declared in opencode.jsonc whose
+    # baseURL we queried. This keeps OmniRoute's ~360 live models under the
+    # "omniroute" group instead of a synthetic host label like "localhost"
+    # (which would hide them from the provider the user actually selects).
     declared = load_provider_models(config_dir)
-    if declared and len(declared) == 1:
+    if proxy_pname:
+        pname = proxy_pname
+    elif declared and len(declared) == 1:
         pname = next(iter(declared))
     else:
         try:
@@ -507,6 +519,29 @@ def get_modelsdev():
     return data or _mdev_cache["data"]
 
 
+def _merge_declared_models(result, config_dir):
+    """Overlay providers declared in opencode.jsonc onto a live model map.
+
+    The live/models.dev sources only know providers reachable right now, so a
+    provider the user maintains by hand (e.g. an offline local server, or any
+    provider whose models were added manually) would vanish from the preset
+    editor whenever the live cache is warm. Merging the declared lists keeps
+    manually-authored models always visible."""
+    declared = load_provider_models(config_dir)
+    if not declared:
+        return result
+    out = dict(result) if isinstance(result, dict) else {}
+    for prov, ids in declared.items():
+        existing = list(out.get(prov, []))
+        seen = set(existing)
+        for mid in ids:
+            if mid not in seen:
+                seen.add(mid)
+                existing.append(mid)
+        out[prov] = existing
+    return out
+
+
 def get_provider_models(config_dir):
     """Combined model suggestions:
     1. live proxy models (5-min cache) + static opencode.jsonc entries
@@ -541,8 +576,8 @@ def get_provider_models(config_dir):
         with _live_lock:
             _live_cache["data"] = combined
             _live_cache["ts"] = time.time()
-        return combined
-    return merged
+        return _merge_declared_models(combined, config_dir)
+    return _merge_declared_models(merged, config_dir)
 
 
 _warming = False
@@ -552,16 +587,18 @@ def get_provider_models_fast(config_dir):
     """Return provider models from cache only — never blocks on network.
 
     Falls back to static entries from opencode.jsonc (fast disk read).
-    When the cache is stale/missing, triggers a background refresh."""
+    When the cache is stale/missing, triggers a background refresh.
+    Declared opencode.jsonc providers are always overlaid so manually-authored
+    or currently-offline providers stay visible."""
     now = time.time()
     with _live_lock:
         fresh = _live_cache["data"] and now - _live_cache["ts"] < MODELS_TTL
         recent_fail = now - _live_cache["fail_ts"] < 60
         cached = _live_cache["data"]
     if fresh:
-        return cached
+        return _merge_declared_models(cached, config_dir)
     if recent_fail:
-        return cached or load_provider_models(config_dir)
+        return _merge_declared_models(cached or load_provider_models(config_dir), config_dir)
     warm_provider_models(config_dir)
     return load_provider_models(config_dir)
 
@@ -587,6 +624,87 @@ def warm_provider_models(config_dir):
                 _warming = False
 
     threading.Thread(target=_warm, daemon=True).start()
+
+
+# ------------------------------------------------- local GGUF folder scan
+
+def scan_gguf_folder(folder):
+    """List model ids discoverable from a local folder of .gguf files.
+
+    Recursively finds .gguf files and returns their base names (without the
+    .gguf extension), sorted and de-duplicated. This matches how llama.cpp's
+    server exposes a model's id from --models-dir. Returns
+    (ids, None) or (None, error)."""
+    raw = str(folder or "").strip().strip('"')
+    if not raw:
+        return None, "No folder selected"
+    path = os.path.abspath(os.path.expanduser(raw))
+    if not os.path.isdir(path):
+        return None, "Folder not found: %s" % path
+    found = []
+    for root, _dirs, files in os.walk(path):
+        for fn in files:
+            if fn.lower().endswith(".gguf"):
+                name = fn[:-5]  # strip ".gguf"
+                # llama.cpp splits multi-part models as name-00001-of-00002.gguf
+                name = re.sub(r"-\d{5}-of-\d{5}$", "", name)
+                if name:
+                    found.append(name)
+    if not found:
+        return None, "No .gguf files found in %s" % path
+    seen = set()
+    uniq = []
+    for n in sorted(found):
+        if n not in seen:
+            seen.add(n)
+            uniq.append(n)
+    return uniq, None
+
+
+_PICK_SCRIPT = (
+    "import sys, tkinter as tk\n"
+    "from tkinter import filedialog\n"
+    "root=tk.Tk()\n"
+    "root.withdraw()\n"
+    "try:\n"
+    "    root.attributes('-topmost', True)\n"
+    "except Exception:\n"
+    "    pass\n"
+    "p=filedialog.askdirectory(initialdir=sys.argv[1], "
+    "title='Select a folder containing .gguf models')\n"
+    "sys.stdout.buffer.write((p or '').encode('utf-8'))\n"
+)
+
+
+def pick_folder_dialog(initial=""):
+    """Open the OS-native 'choose folder' dialog and return the chosen path.
+
+    Runs tkinter in a separate Python process so an unavailable display or a
+    dialog crash can never take down the web server. Returns (path, None) on a
+    selection, (None, None) when the user cancels, or (None, error)."""
+    if not initial:
+        initial = os.path.expanduser("~")
+    exe = sys.executable or "python"
+    # pythonw.exe has no console/stdout; use the console interpreter for capture.
+    if exe.lower().endswith("pythonw.exe"):
+        cand = exe[:-len("pythonw.exe")] + "python.exe"
+        if os.path.exists(cand):
+            exe = cand
+    try:
+        proc = subprocess.run(
+            [exe, "-c", _PICK_SCRIPT, initial],
+            capture_output=True, timeout=300,
+        )
+    except FileNotFoundError:
+        return None, "Python interpreter not found for folder dialog"
+    except subprocess.TimeoutExpired:
+        return None, None
+    if proc.returncode != 0:
+        err = (proc.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+        return None, "Folder dialog failed: %s" % (err[-1] if err else "unknown error")
+    path = (proc.stdout or b"").decode("utf-8", "replace").strip()
+    return (path or None), None
+
 
 
 # ---------------------------------------------------------------- validation
@@ -748,6 +866,8 @@ h1 .dot{color:var(--accent)}
 #mbList .cb-opt:hover,#mbList .cb-opt.kb-active{border-color:var(--accent);background:var(--accent-dim)}
 #mbList .cb-opt.mb-sel{border-color:var(--accent)}
 #mbList .cb-opt .cb-check{margin-right:1px}
+#mbList .cb-opt.mb-custom{border-style:dashed;border-color:var(--accent)}
+#mbList .cb-opt.mb-custom .cb-use{color:var(--accent);font-weight:700;margin-right:2px}
 #mbList .cb-more{width:100%;margin:6px 0 2px}
 .seg{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .seg-btn{min-height:32px;padding:6px 14px;border:1px solid var(--border2);border-radius:999px;background:transparent;color:var(--muted);font:12.5px var(--mono);cursor:pointer;transition:border-color .12s,background .12s,color .12s}
@@ -797,7 +917,14 @@ footer{margin-top:26px;padding-top:12px;border-top:1px solid var(--border);color
 .pm-toolbar{display:flex;gap:12px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
 .pm-toolbar .muted{flex:1}
 .pm-provider{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--panel);margin-bottom:14px}
-.pm-provider h3{margin:0 0 10px;font-size:15px;font-family:var(--mono);color:var(--accent)}
+.pm-provider h3{margin:0 0 10px;font-size:15px;font-family:var(--mono);color:var(--accent);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pm-prov-sel{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11.5px}
+.pm-prov-sel select{min-height:30px;padding:4px 8px;border:1px solid var(--border2);border-radius:7px;background:var(--panel2);color:var(--text);font-family:var(--mono);font-size:12px;cursor:pointer}
+.pm-scan-res{margin-top:10px;border:1px solid var(--border);border-radius:12px;background:#0d1117;padding:10px 12px}
+.pm-scan-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.pm-scan-head .linkbtn{margin-left:auto}
+.pm-pick-hint{font-size:12px}
+.pm-pick-hint code{font-family:var(--mono);font-size:11.5px;color:var(--accent);background:var(--accent-dim);padding:1px 5px;border-radius:5px}
 .pm-model-list{display:flex;flex-wrap:wrap;gap:6px}
 .pm-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;border:1px solid var(--border2);background:var(--panel2);font-family:var(--mono);font-size:12px;color:var(--text);cursor:pointer;transition:border-color .15s,background .15s}
 .pm-chip:hover{border-color:var(--danger);background:#2a1414}
@@ -1056,8 +1183,9 @@ function renderList(){
   if(dup)dup.focus();
 }
 /* ---- provider models view state ---- */
-let pmProvider="omniroute", pmModels={}, pmHasOpencodeJsonc=false;
+let pmProvider="omniroute", pmModels={}, pmHasOpencodeJsonc=false, pmProviders={};
 let pmCatalogOpen=false, pmQuery="", pmActive=-1, pmCatQuery="", pmCatProvider="", pmCatShowAll=false;
+let pmLastScan=[];
 const PM_CAP=8, PM_CAT_CAP=48;
 let pmSuggestions=[];
 
@@ -1161,12 +1289,23 @@ async function loadProviderModelsView(){
     const providers=cfg&&cfg.provider||{};
     const provNames=Object.keys(providers);
     if(!provNames.length){toast("No providers found in opencode.jsonc","error");return;}
+    pmProviders={};
+    provNames.forEach(n=>{pmProviders[n]=providers[n]||{};});
     pmProvider=provNames[0];
-    const provData=providers[pmProvider]||{};
-    pmModels=provData.models||{};
+    pmModels=(pmProviders[pmProvider].models)||{};
     renderProviderModelsView();
     showView("providerModels");
   }catch(e){toast("Cannot load opencode.jsonc: "+e.message,"error");}
+}
+
+/* Switch the provider being edited (keeps each provider's edits in pmProviders). */
+function pmSwitchProvider(prov){
+  if(prov===pmProvider||!pmProviders[prov])return;
+  pmProviders[pmProvider].models=pmModels;  /* stash current edits */
+  pmProvider=prov;
+  pmModels=pmProviders[prov].models||{};
+  pmCatalogOpen=false;pmQuery="";pmActive=-1;
+  renderProviderModelsView();
 }
 
 /* Full (re)build of the view shell. Only called on load; add/remove update in place. */
@@ -1175,17 +1314,26 @@ function renderProviderModelsView(){
   const provNameEl=$("#pmProviderName");
   if(provNameEl)provNameEl.textContent=pmProvider;
   const modelEntries=Object.entries(pmModels);
+  const provNames=Object.keys(pmProviders);
+  const sel='<label class="pm-prov-sel"><span class="muted">Provider</span> <select id="pmProviderSelect" aria-label="Provider to edit">'+
+    provNames.map(n=>'<option value="'+esc(n)+'"'+(n===pmProvider?" selected":"")+'>'+esc(n)+'</option>').join("")+
+    '</select></label>';
   let html='<div class="pm-provider">'+
-    '<h3>'+esc(pmProvider)+' <span class="muted" id="pmCount" style="font-size:11px;text-transform:none;letter-spacing:0">('+modelEntries.length+' model'+(modelEntries.length!==1?"s":"")+')</span></h3>'+
+    '<h3>'+esc(pmProvider)+' <span class="muted" id="pmCount" style="font-size:11px;text-transform:none;letter-spacing:0">('+modelEntries.length+' model'+(modelEntries.length!==1?"s":"")+')</span>'+sel+'</h3>'+
     '<div class="pm-model-list" id="pmModelList"></div>'+
     '<div class="pm-add-section">'+
     '<div class="pm-add-wrap">'+
-    '<input id="pmAddInput" type="text" placeholder="Type a model id (e.g. MiniMax) or paste one" spellcheck="false" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="pmAc" aria-autocomplete="list" aria-label="Add model id">'+
+    '<input id="pmAddInput" type="text" placeholder="Type a model id (e.g. granite-4.1-8b-Q4_K_M) or paste one" spellcheck="false" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="pmAc" aria-autocomplete="list" aria-label="Add model id">'+
     '<div class="pm-ac" id="pmAc" hidden></div>'+
     '</div>'+
     '<button class="btn primary" data-action="pm-add">Add</button>'+
     '<button class="btn" data-action="pm-toggle-cat" id="pmCatToggle" aria-expanded="false">Browse catalog</button>'+
     '</div>'+
+    '<div class="pm-add-section">'+
+    '<button class="btn" data-action="pm-pick-folder" id="pmPickBtn">&#128193; Choose folder\u2026</button>'+
+    '<span class="muted pm-pick-hint">Scan a folder for <code>.gguf</code> models and add them.</span>'+
+    '</div>'+
+    '<div id="pmScanResult"></div>'+
     '<div id="pmCatalog"></div>'+
     '</div>';
   html+='<div style="margin-top:14px;display:flex;gap:8px">'+
@@ -1325,10 +1473,56 @@ async function pmAddModel(){
 
 async function pmSave(){
   try{
-    const res=await api("/api/opencode-provider-models",{provider:pmProvider,models:pmModels});
-    if(res.ok){toast("Provider models saved to opencode.jsonc");loadConfig();showView("home");}
-    else{toast(res.error||"Failed to save","error");}
+    /* Persist every provider we loaded so switching does not discard edits. */
+    pmProviders[pmProvider].models=pmModels;
+    const names=Object.keys(pmProviders);
+    for(const n of names){
+      const models=pmProviders[n].models||{};
+      const res=await api("/api/opencode-provider-models",{provider:n,models:models});
+      if(!res.ok)throw new Error(n+": "+(res.error||"Failed to save"));
+    }
+    toast("Provider models saved to opencode.jsonc");loadConfig();showView("home");
   }catch(e){toast("Error: "+e.message,"error");}
+}
+
+/* Open the native folder chooser, scan the chosen folder for .gguf models,
+   and render them as addable chips. */
+async function pmPickFolder(){
+  const host=$("#pmScanResult");
+  const btn=$("#pmPickBtn");
+  if(btn){btn.disabled=true;btn.textContent="Scanning\u2026";}
+  if(host)host.innerHTML='<span class="muted">Waiting for folder selection\u2026</span>';
+  try{
+    const res=await fetch("/api/pick-folder");
+    const data=await res.json();
+    if(!data.ok){
+      if(host)host.innerHTML='<span class="pm-empty">'+esc(data.error||"Folder dialog failed")+'</span>';
+      toast(data.error||"Folder dialog failed","error");
+      return;
+    }
+    if(data.cancelled){if(host)host.innerHTML="";return;}
+    const ids=data.models||[];
+    if(!ids.length){
+      if(host)host.innerHTML='<span class="pm-empty">'+esc(data.warning||("No .gguf files found in "+data.folder))+'</span>';
+      return;
+    }
+    pmLastScan=ids;
+    let html='<div class="pm-scan-res"><div class="pm-scan-head"><span class="muted">'+ids.length+' model'+(ids.length===1?"":"s")+' in '+esc(data.folder)+'</span>'+
+      '<button type="button" class="linkbtn" data-pm-scan-all="1">Add all</button></div><div class="pm-cat-models">';
+    ids.forEach(mid=>{
+      const added=!!pmModels[mid];
+      html+='<span class="cb-opt'+(added?" mb-sel":"")+'" role="button" tabindex="0" data-pm-scan-add="'+esc(mid)+'" title="'+(added?"Already added":"Add ")+esc(mid)+'">'+
+        (added?'<span class="cb-check">\u2713 </span>':"")+esc(mid)+'</span>';
+    });
+    html+='</div></div>';
+    if(host)host.innerHTML=html;
+    if(data.warning)toast(data.warning,"error");
+  }catch(e){
+    if(host)host.innerHTML='<span class="pm-empty">Scan failed: '+esc(e.message)+'</span>';
+    toast("Scan failed: "+e.message,"error");
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML="&#128193; Choose folder\u2026";}
+  }
 }
 
 /* ---- split-view editor state + model catalog ---- */
@@ -1491,13 +1685,26 @@ function renderMb(keepScroll){
   const cap=mbState.showAll?Infinity:(q?MB_CAP_Q:MB_CAP_NOQ);
   const shown=matches.slice(0,cap);
   let html="",flat=[];
+  /* When the user types an id that is not in the catalog, offer it verbatim so
+     any upstream model can be assigned manually (e.g. a brand-new OmniRoute id
+     the registry has not caught up with yet). Bare ids are qualified with the
+     selected provider; ids already containing a "/" are used as-is. */
+  const qraw=mbState.q.trim();
+  const customVal=qraw?(qraw.indexOf("/")>=0?qraw:(mbState.provider?mbState.provider+"/"+qraw:qraw)):"";
+  const customAdd=customVal&&cbData.models.indexOf(customVal)<0;
+  if(customAdd){
+    const sel=edState[activeAgent].model===customVal;
+    html+='<div class="cb-opt mb-custom'+(sel?" mb-sel":"")+'" id="mb-opt-0" role="option" aria-selected="'+sel+'" data-val="'+esc(customVal)+'" title="Use this id as-is">'+
+      (sel?'<span class="cb-check">\u2713 </span>':"")+'<span class="cb-use">Use</span> '+modelHtml(customVal)+'</div>';
+    flat.push(customVal);
+  }
   shown.forEach(v=>{
     const sel=edState[activeAgent].model===v;
     html+='<div class="cb-opt'+(sel?" mb-sel":"")+'" id="mb-opt-'+flat.length+'" role="option" aria-selected="'+sel+'" data-val="'+esc(v)+'" title="'+esc(v)+'">'+
       (sel?'<span class="cb-check">\u2713 </span>':"")+modelHtml(v)+'</div>';
     flat.push(v);
   });
-  const hidden=matches.length-flat.length;
+  const hidden=matches.length-shown.length;
   const baseCap=q?MB_CAP_Q:MB_CAP_NOQ;
   let out='<div class="mb-chips" role="listbox" aria-label="Models">'+html+'</div>';
   if(!flat.length){
@@ -1507,12 +1714,14 @@ function renderMb(keepScroll){
       out='<div class="cb-empty">No matches for \u201c'+esc(mbState.q)+'\u201d in '+esc(mbState.provider)+'.'+
         (others?' '+others+' match'+(others===1?"":"es")+' in other providers.':'')+'</div>';
     }else{
-      out='<div class="cb-empty">No models for this provider.</div>';
+      out='<div class="cb-empty">No models for this provider. Type an id above to add one manually.</div>';
     }
-  }else if(hidden>0&&!mbState.showAll){
-    out+='<button type="button" class="cb-more" data-cbmore="1">Show all \u2014 '+hidden+' more model'+(hidden===1?"":"s")+'</button>';
-  }else if(mbState.showAll&&matches.length>baseCap){
-    out+='<button type="button" class="cb-more" data-cbmore-less="1">Show fewer</button>';
+  }else{
+    if(hidden>0&&!mbState.showAll){
+      out+='<button type="button" class="cb-more" data-cbmore="1">Show all \u2014 '+hidden+' more model'+(hidden===1?"":"s")+'</button>';
+    }else if(mbState.showAll&&matches.length>baseCap){
+      out+='<button type="button" class="cb-more" data-cbmore-less="1">Show fewer</button>';
+    }
   }
   mbState.flat=flat;
   if(mbState.active>=flat.length)mbState.active=flat.length-1;
@@ -1767,6 +1976,7 @@ $("#agentsGrid").addEventListener("keydown",e=>{
     }else if(e.key==="Enter"){
       e.preventDefault();
       if(mbState.active>=0&&mbState.flat[mbState.active]!==undefined)mbAssign(mbState.flat[mbState.active]);
+      else if(mbState.flat.length)mbAssign(mbState.flat[0]);
     }else if(e.key==="Escape"){
       e.preventDefault();t.blur();
     }
@@ -1799,6 +2009,7 @@ document.addEventListener("click",async e=>{
   }
   if(act==="pm-back"){showView("home");return;}
   if(act==="pm-add"){await pmAddModel();return;}
+  if(act==="pm-pick-folder"){await pmPickFolder();return;}
   if(act==="pm-toggle-cat"){
     pmCatalogOpen=!pmCatalogOpen;
     if(pmCatalogOpen)pmCatQuery="";
@@ -1806,6 +2017,11 @@ document.addEventListener("click",async e=>{
     return;
   }
   if(act==="pm-save"){await pmSave();return;}
+});
+/* Provider selector changes which provider's model list is edited. */
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.id==="pmProviderSelect")pmSwitchProvider(t.value);
 });
 /* Chips, catalog provider pills, catalog items. */
 document.addEventListener("click",e=>{
@@ -1864,6 +2080,25 @@ document.addEventListener("click",e=>{
     const mid=catItem.dataset.pmCatAdd;
     if(pmModels[mid])return;
     pmCommit(mid);
+    return;
+  }
+  const scanAdd=e.target.closest("[data-pm-scan-add]");
+  if(scanAdd){
+    const mid=scanAdd.dataset.pmScanAdd;
+    if(pmCommit(mid)){
+      scanAdd.classList.add("mb-sel");
+      scanAdd.title="Already added";
+      if(!scanAdd.querySelector(".cb-check"))scanAdd.insertAdjacentHTML("afterbegin",'<span class="cb-check">\u2713 </span>');
+    }
+    return;
+  }
+  if(e.target.closest("[data-pm-scan-all]")){
+    (pmLastScan||[]).forEach(mid=>{if(!pmModels[mid])pmModels[mid]={name:mid};});
+    renderPMModels();
+    document.querySelectorAll("[data-pm-scan-add]").forEach(el=>{
+      el.classList.add("mb-sel");el.title="Already added";
+      if(!el.querySelector(".cb-check"))el.insertAdjacentHTML("afterbegin",'<span class="cb-check">\u2713 </span>');
+    });
     return;
   }
 });
@@ -2042,6 +2277,35 @@ class Handler(BaseHTTPRequestHandler):
                     "config": data,
                     "providerModels": prov_models,
                 })
+            return
+        if path == "/api/scan-gguf":
+            qs = parse_qs(urlparse(self.path).query)
+            folder = (qs.get("folder") or [""])[0]
+            ids, err = scan_gguf_folder(folder)
+            if err:
+                self._send(400, {"ok": False, "error": err})
+                return
+            self._send(200, {"ok": True, "folder": folder, "models": ids})
+            return
+        if path == "/api/pick-folder":
+            # Open the OS-native folder chooser, then scan it for .gguf models.
+            # Runs outside the config lock; the dialog blocks this request only.
+            qs = parse_qs(urlparse(self.path).query)
+            initial = (qs.get("initial") or [""])[0]
+            folder, err = pick_folder_dialog(initial)
+            if err:
+                self._send(500, {"ok": False, "error": err})
+                return
+            if not folder:
+                self._send(200, {"ok": True, "cancelled": True})
+                return
+            ids, scan_err = scan_gguf_folder(folder)
+            self._send(200, {
+                "ok": True,
+                "folder": folder,
+                "models": ids or [],
+                "warning": scan_err,
+            })
             return
         self._send(404, {"ok": False, "error": "Not found"})
 

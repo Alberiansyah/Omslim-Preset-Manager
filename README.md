@@ -27,14 +27,23 @@ and to curate a provider's model list.
 - **Model browser** — provider pills switch a single-provider panel of model chips, so you never
   face a wall of every model at once. Search, keyboard navigation (`↑`/`↓` + `Enter`), and a
   per-provider "Show all" affordance. Click a model to assign it and jump straight to the next agent.
-- **Provider Models editor** — manage the model list for the provider declared in `opencode.jsonc`.
-  Models render as removable chips; add them by typing with live catalog autocomplete or by browsing
-  a searchable, provider-grouped catalog you can show or hide.
+  Type any id that is not in the catalog to assign it manually — a dashed **Use …** chip appears and
+  `Enter` picks it (bare ids are qualified with the selected provider).
+- **Provider Models editor** — manage the model list for any provider declared in `opencode.jsonc`
+  via a **Provider** dropdown (e.g. switch between `omniroute` and `localserver`). Models render as
+  removable chips; add them by typing (with live catalog autocomplete), by browsing a searchable,
+  provider-grouped catalog, or by scanning a local folder (below). Every provider is saved together,
+  so switching never discards edits.
+- **Scan local GGUF folder** — click **📁 Choose folder…** to open the OS-native folder picker, pick a
+  directory of `.gguf` files (e.g. `D:\LLM`), and its models appear as addable chips (or **Add all**).
+  The dialog runs in a separate process, so it can never take down the server.
 - **Starter templates** — begin from `empty`, `openai`, `opencode-go`, `opencode-zen-free`, `kimi`,
   `copilot`, `zai-plan`, or `anthropic` — or clone any of your existing presets.
 - **Live model lists** — pulls model IDs from your local OpenAI-compatible proxy and
   [models.dev](https://models.dev) (the same registry OpenCode uses), merged with providers declared
-  in your `opencode.json` / `opencode.jsonc`. Cached (5 min live / 1 h registry), read-only.
+  in your `opencode.json` / `opencode.jsonc`. Declared providers are always overlaid, so
+  manually-authored or currently-offline providers (e.g. a local llama.cpp server) stay visible.
+  Cached (5 min live / 1 h registry), read-only.
 - **"Apply to all" helpers** — copy a variant, skill list, or MCP list to every agent in one click.
 - **JSONC tolerant** — reads `opencode.jsonc` with comments and trailing commas just fine.
 
@@ -51,6 +60,8 @@ Your config files are treated as fragile:
 
 - Python 3 (standard library only — no third-party packages)
 - Any OS that runs Python; Windows users get a double-click launcher (`PresetManager.bat`)
+- The native **Choose folder…** picker uses `tkinter` (bundled with the official Windows/macOS
+  Python). If `tkinter` is unavailable, folder scanning still works via `GET /api/scan-gguf?folder=…`.
 
 ## Quick start
 
@@ -89,6 +100,8 @@ The web UI talks to a small JSON API on the same server:
 | `GET /api/config` | Current preset config, config path, backup list, and provider model catalog |
 | `GET /api/templates` | Built-in starter templates plus clones of your existing presets |
 | `GET /api/opencode-config` | Parsed `opencode.jsonc` and its provider model lists |
+| `GET /api/scan-gguf?folder=…` | Model ids discovered from a local folder of `.gguf` files |
+| `GET /api/pick-folder` | Open the OS-native folder picker, then scan it for `.gguf` models |
 | `POST /api/preset` | Create, update, or rename a preset |
 | `POST /api/activate` | Set the active preset |
 | `POST /api/delete` | Delete a preset (blocked while active) |
